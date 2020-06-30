@@ -59,4 +59,4 @@ This mechanism was written in Julia Version 1.2.0 on a macOS (x86_64-apple-darwi
 An archived version of this code can be found on Zenodo:
 https://doi.org/10.5281/zenodo.3733503
 
-Feel free to direct all questions to P. Obin Sturm at posturm@ucdavis.edu
+Feel free to direct all questions to Obin Sturm, posturm@ucdavis.edu
