@@ -7,3 +7,53 @@ The top level module for the mechanism is contained in the file assign3_driver.j
 The output files C_and_J.txt and S.txt are available for download.
 
 Further documentation is contained in the .jl files.
+Reactions and Species
+
+# Reactions
+1)  NO2 + hv -> NO + O
+
+2)  O + O2 -> O3
+
+3)  O3 + NO -> NO2 + O2
+
+4)  HCHO + hv -> 2 HO2. + CO
+
+5)  HCHO + hv -> H2 + CO
+
+6)  HCHO + HO. -> HO2. + CO + H2O
+
+7)  HO2. + NO -> OH. + NO2
+
+8)  OH. + NO2 -> HNO3
+
+9)  HO2H + hv -> 2 HO.
+
+10) HO2H + HO. -> H2O + HO2.
+
+# Species
+1) O3
+
+2) NO
+
+3) NO2
+
+4) HCHO
+
+5) HO2.
+
+6) HO2H
+
+7) OH.
+
+8) O
+
+9) HNO3
+
+10) CO
+
+11) H2
+
+# Other Information
+This mechanism was written in Julia Version 1.2.0 on a macOS (x86_64-apple-darwin18.6.0). Full documentation is contained within the .jl files.
+
+Feel free to direct all questions to P. Obin Sturm at posturm@ucdavis.edu
