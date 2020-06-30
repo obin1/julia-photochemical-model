@@ -1,0 +1,2 @@
+# FormO3NOx
+A small photochemical mechanism with reactions related to ozone formation: NOx chemistry, VOC chemistry, formation of a peroxy radical from VOC chemistry, and further reaction of the peroxy radical with NO to form NO2 and OH. This Julia module is based on a Fortran mechanism from Dr. Michael Kleeman's graduate course at University of California, Davis on atmospheric chemistry modeling.
