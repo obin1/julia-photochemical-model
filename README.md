@@ -8,9 +8,9 @@ The output files C_and_J.txt and S.txt are available for download.
 
 Further documentation is contained in the .jl files.
 
-## Reactions and Species
+# Reactions and Species
 
-# Reactions
+## Reactions
 1)  NO2 + hv -> NO + O
 
 2)  O + O2 -> O3
@@ -31,7 +31,7 @@ Further documentation is contained in the .jl files.
 
 10) HO2H + HO. -> H2O + HO2.
 
-# Species
+## Species
 1) O3
 
 2) NO
