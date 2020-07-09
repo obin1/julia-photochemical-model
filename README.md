@@ -7,7 +7,8 @@ The top level module for the mechanism is contained in the file assign3_driver.j
 The output files C_and_J.txt and S.txt are available for download.
 
 Further documentation is contained in the .jl files.
-Reactions and Species
+
+## Reactions and Species
 
 # Reactions
 1)  NO2 + hv -> NO + O
