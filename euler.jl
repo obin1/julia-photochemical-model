@@ -4,6 +4,8 @@ function euler!(t1,t2,dt,tm,c,daymax,n::Int64,rk,dc::Function)
 This is a function in an ozone NOx formaldehyde mechanism, adapted from Fortran
 by Obin Sturm (UC Davis) in October 2019.
 The original comments and file description are below.
+Written in Julia Version 1.2.0, tested up to 1.4.2
+
 
     created by: Mike Kleeman (April 1999)
                 ECI 298 Air Quality Modeling
@@ -48,8 +50,9 @@ The original comments and file description are below.
     while (Time < t2)
         # oscillating HV value during the day
         constn[2] = daymax*max(sin(Time/720*pi - pi/2),0.0)
+        # constn[2] = 1 for quick testing with original mechanism
 
-        f = dc(c,f,n)
+        f,s = dc(c,f,n)
         #       print*,'report from euler:c,f'
         #       do i=1,n
         #        print*,i,c(i),f(i)
@@ -59,9 +62,15 @@ The original comments and file description are below.
         c .= c .+ f*dt
         if any(c.<0.0)
             c[c.<0] .= 0
-            #s_aggregate[1] = NaN  # Added March 2020: marker to show possible mass balance violation
+            #s_aggregate[1] = NaN  # Added March 2020: marker to show mass balance violation
             #println("Mass balance prob")
         end
+
+        f,s = dc(c,f,n)  # Added July 2021: update pseudo steady state species before assigning to concentration
+        c[7] = s[1]  # Added Jan 2021: fix printing error leading to zero concentrations of steady state species
+        c[8] = s[2]
+
+
 
 
         Time = Time + dt
@@ -109,7 +118,7 @@ function diff!(c,f,n)
 
 # calculate the net rate of reaction for active species
     f[1:maxact] .= fr[1:maxact] .- rlr[1:maxact].*c[1:maxact]
-    return f
+    return f,s
 end
 
 function jcalc(c,n,dc,rj)

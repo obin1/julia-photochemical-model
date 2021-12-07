@@ -1,6 +1,7 @@
 #=*****************************************************************************
  This is a module in an ozone NOx formaldehyde mechanism, adapted from Fortran
  by Obin Sturm (UC Davis) in October 2019.
+ Written in Julia Version 1.2.0, tested up to 1.4.2
 
  This module was recieved from Mike Kleeman (UC Davis) in October 2018.
  ****************************************************************************=#

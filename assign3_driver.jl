@@ -3,30 +3,47 @@ include("modlspc.jl")
 include("assign2_rk.jl")
 include("euler.jl")
 include("assign3a.jl")
-include("chemODE.jl")
-include("stiff.jl")
-#using DifferentialEquations
 using LinearAlgebra
 import Random
 export gas
 
 function gas(t1,t2,tm,days::Int64)
 #=**************************************************************************
-This is the main function in an ozone NOx formaldehyde mechanism, adapted from Fortran
-by Obin Sturm (UC Davis) in October 2019.  It has been edited in order to generate training
+This is top level function in an ozone NOx formaldehyde mechanism, rewritten from Fortran
+by Obin Sturm (UC Davis) in October 2019.  It has been adapted in order to generate training
 data for machine learning and restricted inverse algorithms.
+Written in Julia Version 1.2.0, tested up to 1.4.2
+
+For questions please contact Obin Sturm at posturm@ucdavis.edu
 
 Notable changes:
 Oct 2019 -- Random seeding of concentrations, looping over days, incorporating
             fluctuating daylight constant (HV) values.
          -- Option to use stiff equation solver.  To use this
             integration method, set method to "stiff!" instead of "euler!"
+            Note: deprecated March 2020
 
 Mar 2020 -- Implementation of a NaN in the first column of S output matrix
             when using "euler" method.  This is used as a flag for when
             concentrations are negative and a mass balance violation occurs
             (a limitation of the original Fortran mechanism).
+            Note: removed January 2021
 
+July 2021 -- Fix of a printing bug inherited from original Fortran code,
+            that printed pseudo-steady state species as zero. This is fixed
+            in euler.jl
+
+
+
+            Inputs:
+             t1   - start time in minutes
+             t2   - stop time in minutes
+             tm   - concentration recording timestep
+             days - number of independent trials from t1 to t2
+            Outputs:
+             C    -  species concentrations, each column a new species
+             S    -  integrated rate of reaction, each column a new reaction
+             J    -  daylight constant influencing photolytic reactions
 
 The original comments and file description are below.
      created by: Mike Kleeman (April 1999)
@@ -40,9 +57,6 @@ The original comments and file description are below.
 **************************************************************************=#
 # names for active species.
 #    name = ["O3", "NO", "NO2","HCHO","HO2.","HO2H","HO.","O","HNO3","CO","H2"]
-
-    Random.seed!(43) # Seed, for replicability. 43 was arbitrary 😁
-
     constn[1] = Float32(2.09e+05) # O2 concentration in ppm
 
 
@@ -52,6 +66,7 @@ The original comments and file description are below.
     #      tempk = 283.
     #      press = 0.7
     global rk = getrk!(tempk,press,rk)
+
 
 
 # call the integration subroutine to advance the solution
@@ -73,15 +88,20 @@ The original comments and file description are below.
         c[4] = 0.02*10^(2*rand())          # HCHO range: 0.02 - 2 ppm
         c[5] = 1.0e-05 * rand()            # HO2. range: 1 - 10 *ppt*
         c[6] = 0.01*rand()	               # HO2H range: 0.001 - 0.01 ppm
-        c[7:11] = zeros(Float64,1,5)
+        # make sure ss species are also printed at the beginning
+        global s, r, fr, rlr = difun!(constn,c,rpssa,rk,r,fr,rlr)
+        # print("steady state species at beginning: ",s)
+        c[7] = s[1]
+        c[8] = s[2]
+        c[9:11] = zeros(Float64,1,3)       # buildup species start at zero
 
-        # c[1] = 0.0  # For testing with original Fortran mechanism
-        # c[2] = 0.0421
-        # c[3] = 0.0679
-        # c[4] = 0.1
-        # c[5] = 0.0
-        # c[6] = 0.01
-        # c[7:11] = zeros(Float64,1,5)
+         # c[1] = 0.0  # For testing with original Fortran mechanism
+         # c[2] = 0.0421
+         # c[3] = 0.0679
+         # c[4] = 0.1
+         # c[5] = 0.0
+         # c[6] = 0.01
+         # c[7:11] = zeros(Float64,1,5)
 
         daymax = rand(Float64)
 
