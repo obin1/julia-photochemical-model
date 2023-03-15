@@ -33,6 +33,7 @@ for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020
          9) HNO3
         10) CO
         11) H2
+        12) H2O
 
  S corresponds to the following reactions:
          1) NO2 + HV = NO + O
@@ -58,7 +59,8 @@ A =           [0  1 -1  0  0  0  0  0  0  0;
                1 -1  0  0  0  0  0  0  0  0;
                0  0  0  0  0  0  0  1  0  0;
                0  0  0  1  1  1  0  0  0  0;
-               0  0  0  0  1  0  0  0  0  0]
+               0  0  0  0  1  0  0  0  0  0;
+               0  0  0  0  0  1  0  0  0  1]
 ****************************************************************************=#
 
 mechanism = include("assign3_driver.jl") # Include photochemical mechanism module
