@@ -139,7 +139,7 @@ savefig("CQ3_varyingTP.pdf")
 
 HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]
 HN = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0]
-# HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 1]
+# HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 2]
 
 # CV's are coefficients of variation (standard deviation divided by the mean)
 cvC = zeros(num_exp)
