@@ -8,18 +8,15 @@ and subsequent versions have been tested up to 1.8.1
 
 Written by Obin Sturm (posturm@ucdavis.edu)
 
-
-The inverse problem tries to solve for S according to
-
-  A*S = ∆C
-
- where S is the integrated reaction rates over a given timestep, and ∆C is the
- change in concentration.
-
-The output files are "C.txt", "S.txt" and "delC.txt" for use in machine
-learning research and inverse problems.  This was first used in a paper
+This toy photochemical model was developed for use in machine
+learning applications for atmospheric chemistry research.  Its first use was
 introducing a framework for conserving mass in machine learning applications
-for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020
+for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020.
+Subsequent work involved building this framework directly into a neural network:
+
+Sturm, P. O. and Wexler, A. S.: Conservation laws in a neural network architecture: 
+enforcing the atom balance of a Julia-based photochemical model (v0.2.0), 
+Geosci. Model Dev., 15, 3417–3431, https://doi.org/10.5194/gmd-15-3417-2022, 2022.
 
  C and delC correspond to the following species:
          1) O3
@@ -34,7 +31,7 @@ for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020
         10) CO
         11) H2
 
- S corresponds to the following reactions:
+ S corresponds to the flux, or extent of reaction, of the following reactions:
          1) NO2 + HV = NO + O
          2) O + O2 = O3
          3) O3 + NO = NO2 + O2
@@ -46,7 +43,7 @@ for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020
          9) HO2H + HV = 2 HO.
         10) HO2H + HO. = H2O + HO2
 The stoichiometry matrix A, which can also be interpreted as the directed,
-weighted incidence matrix of the species-reaction network, is
+weighted biadjacency matrix of the species-reaction network, is
 
 A =           [0  1 -1  0  0  0  0  0  0  0;
                1  0 -1  0  0  0 -1  0  0  0;
