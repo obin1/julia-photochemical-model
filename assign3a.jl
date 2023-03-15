@@ -37,6 +37,9 @@ function bldup!(r,dy)
     # H2
     dy[3] = r[5]
 
+    # H20
+    dy[4] = r[6] + r[10]
+ 
     return dy
 end
 

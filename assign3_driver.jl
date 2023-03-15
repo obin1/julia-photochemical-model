@@ -56,6 +56,7 @@ The original comments and file description are below.
 # names for active species.
 #    name = ["O3", "NO", "NO2","HCHO","HO2.","HO2H","HO.","O","HNO3","CO","H2"]
     constn[1] = Float32(2.09e+05) # O2 concentration in ppm
+    num_buildup = 12 # adding h2o to buildup species
 
 
 # get the reaction rate constants at 1 atm and 25C--
@@ -72,7 +73,7 @@ The original comments and file description are below.
 #    t2 = Float64(60.0*24.0*1.0) # 60 mins/hr * 24 hrs/day *1 day
     dt = Float64(1.0e-3)
 #    tm = Float64(6.0)
-    C = zeros(1,11)
+    C = zeros(1,num_buildup)
     S = zeros(1,10)
     J = zeros(1,1)
     T = zeros(1,1)
@@ -110,24 +111,16 @@ The original comments and file description are below.
         #      tempk = 283.
         #      press = 0.7
         global rk = getrk!(tempk,press,rk)
-        println("rk: ", rk)
-        println("P = ",press,", T = ",tempk)
+        # println("rk: ", rk)
+        # println("P = ",press,", T = ",tempk)
 
         # make sure ss species are also printed at the beginning
         global s, r, fr, rlr = difun!(constn,c,rpssa,rk,r,fr,rlr)
         # print("steady state species at beginning: ",s)
         c[7] = s[1]
         c[8] = s[2]
-        c[9:11] = zeros(Float64,1,3)       # buildup species start at zero
-        # c[11] = 0.0011637709108759861 # check H2 invariance for Ziming
+        c[9:num_buildup] = zeros(Float64,1,4)     # buildup species start at zero
 
-         # c[1] = 0.0  # For testing with original Fortran mechanism
-         # c[2] = 0.0421
-         # c[3] = 0.0679
-         # c[4] = 0.1
-         # c[5] = 0.0
-         # c[6] = 0.01
-         # c[7:11] = zeros(Float64,1,5)
 
         daymax = rand(Float64)
 

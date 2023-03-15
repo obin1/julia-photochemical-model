@@ -9,7 +9,7 @@
 
 #  parameter definitions common to several subroutines
 
-const maxcon, maxact, maxrxn, maxbo, maxsts = 10, 8, 20, 3, 2
+const maxcon, maxact, maxrxn, maxbo, maxsts = 10, 8, 20, 4, 2
 const constn = zeros(Float64,1,maxcon) # note: renamed from Fortran const due to conflict with Julia function const()
 const rpssa  = zeros(Float64,1,maxsts)
 const r  = zeros(Float64,1,maxrxn)
