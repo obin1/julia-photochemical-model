@@ -2,7 +2,7 @@
 The Julia photochemical model (formerly FormO3NOx) is small photochemical mechanism with reactions related to ozone formation: NOx chemistry, VOC chemistry, formation of a peroxy radical from VOC chemistry, and further reaction of the peroxy radical with NO to form NO2 and OH. It is based on a Fortran mechanism from Dr. Michael Kleeman's graduate course ECI241 on air quality modeling at University of California, Davis.
 
 # Code Structure and Output
-The top level module for the mechanism is contained in the file assign3_driver.jl.  The wrapper program main.jl runs this module for a user-specified number of cases of user-specified duration, and generating concentration data at specified intervals. Further documentation is contained in the .jl files.
+The top level module for the mechanism is contained in the file assign3_driver.jl.  The wrapper program main.jl runs this module for a user-specified number of cases of user-specified duration, and generates model output at specified intervals. Further documentation is contained in the .jl files.
 
 The "jpm-h2o" branch adds net production of H2O as a buildup species.
 
