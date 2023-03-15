@@ -34,7 +34,7 @@ function bldup!(r,dy)
     # CO
     dy[2] = r[4]+r[5]+r[6]
 
-    # HO
+    # H2
     dy[3] = r[5]
 
     return dy

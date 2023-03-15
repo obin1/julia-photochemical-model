@@ -49,8 +49,8 @@ Written in Julia Version 1.2.0, tested up to 1.4.2
 
     while (Time < t2)
         # oscillating HV value during the day
-        constn[2] = daymax*max(sin(Time/720*pi - pi/2),0.0)
-        # constn[2] = 1 for quick testing with original mechanism
+        # constn[2] = daymax*max(sin(Time/720*pi - pi/2),0.0)
+        constn[2] = 1 # for quick testing with original mechanism
 
         f,s = dc(c,f,n)
         #       print*,'report from euler:c,f'
@@ -66,21 +66,21 @@ Written in Julia Version 1.2.0, tested up to 1.4.2
             #println("Mass balance prob")
         end
 
+        Time = Time + dt
+        s_aggregate = s_aggregate .+ r.*dt
+        
+        # October 2022: move to after calculating s_aggregate so r is not updated and ΔC = AS
         f,s = dc(c,f,n)  # Added July 2021: update pseudo steady state species before assigning to concentration
         c[7] = s[1]  # Added Jan 2021: fix printing error leading to zero concentrations of steady state species
         c[8] = s[2]
-
-
-
-
-        Time = Time + dt
-        s_aggregate = s_aggregate .+ r.*dt
 
         if mod(icount,floor(Int,1000*tm)) == 0
             C[icount ÷ floor(Int,1000*tm)+1,:] = copy(c[1,:])
             S[icount ÷ floor(Int,1000*tm),:]   = copy(s_aggregate)
             J[icount ÷ floor(Int,1000*tm)+1,1] = copy(constn[2])
             s_aggregate = zeros(Float64,1,maxrxn)
+            # print("C: ", c)
+            # print("R: ", r)
         end
         icount=icount+1
 
