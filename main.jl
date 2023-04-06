@@ -140,13 +140,16 @@ A =           [0  1 -1  0  0  0  0  0  0  0;
 #                  legend=false)
 
 
-plot(p1, p2, layout=(1,2))
-savefig("CQ3_varyingTP.pdf")
+# plot(p1, p2, layout=(1,2))
+# savefig("CQ3_varyingTP.pdf")
 
 HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0]
 HN = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0]
 HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 2, 2]
-HH[7] = 0 # excluding OH, hydrogen is much better conserved
+CQ4 = [ 0.41397873, -0.3040862 ,  0.10989254,  0.08430112,  0.49827986,
+0.16860225,  0.08430112,  0.41397873,  0.19419366, -0.08430112,
+-0.39591421, -0.24537649]
+# HH[7] = 0 # excluding OH, hydrogen is much better conserved
 
 # CV's are coefficients of variation (standard deviation divided by the mean)
 cvC = zeros(num_exp)
@@ -154,7 +157,7 @@ cvN = zeros(num_exp)
 cvH = zeros(num_exp)
 cv1 = zeros(num_exp)
 cv2 = zeros(num_exp)
-cv3 = zeros(num_exp)
+cv4 = zeros(num_exp)
 cv3_snapped = zeros(num_exp)
 
 for i = 1:num_exp
@@ -164,7 +167,7 @@ for i = 1:num_exp
         cvH[i] = std(c_exp*HH) / abs(mean(c_exp*HH))
         # cv1[i] = std(c_exp*V[1,:]) / abs(mean(c_exp*V[1,:]))
         # cv2[i] = std(c_exp*V[2,:]) / abs(mean(c_exp*V[2,:]))
-        # cv3[i] = std(c_exp*V[3,:]) / abs(mean(c_exp*V[3,:]))
+        cv4[i] = std(c_exp*CQ4) / abs(mean(c_exp*CQ4))
         # cv3_snapped[i] = std(c_exp*CQ3_snapped) / abs(mean(c_exp*CQ3_snapped))
 end
 
@@ -173,10 +176,10 @@ end
 # cv3_95 = percentile(cv3,95)*100
 # cv3_50 = percentile(cv3,50)*100
 
-h1 = histogram(cv1*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ1")
-h2 = histogram(cv2*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ2")
-h3 = histogram(cv3*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ3")
-hall = plot(h1,h2,h3,size=(12e2,7e2))
-plot!(margin=5mm)
-savefig("histogram_relativevariation.pdf")
+# h1 = histogram(cv1*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ1")
+# h2 = histogram(cv2*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ2")
+# h3 = histogram(cv3*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ3")
+# hall = plot(h1,h2,h3,size=(12e2,7e2))
+# plot!(margin=5mm)
+# savefig("histogram_relativevariation.pdf")
 
