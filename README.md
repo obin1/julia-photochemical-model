@@ -4,7 +4,7 @@ The Julia photochemical model (formerly FormO3NOx) is small photochemical mechan
 # Code Structure and Output
 The top level module for the mechanism is contained in the file assign3_driver.jl.  The wrapper program main.jl runs this module for a user-specified number of cases of user-specified duration, and generates model output at specified intervals. Further documentation is contained in the .jl files.
 
-The "jpm-h2o" branch adds net production of H2O as a buildup species.
+The "jpm-o2-h2o" branch adds net production of H2O as a buildup species and net production/loss of O2. This is to track atom conservation of all elements in the system: C, N, O, and H.
 
 # Reactions and Species
 
@@ -15,11 +15,11 @@ The "jpm-h2o" branch adds net production of H2O as a buildup species.
 
 3)  O3 + NO -> NO2 + O2
 
-4)  HCHO + hv -> 2 HO2. + CO
+4)  HCHO + hv + 2 O2 -> 2 HO2. + CO
 
 5)  HCHO + hv -> H2 + CO
 
-6)  HCHO + HO. -> HO2. + CO + H2O
+6)  HCHO + HO. + O2 -> HO2. + CO + H2O
 
 7)  HO2. + NO -> OH. + NO2
 
@@ -46,13 +46,15 @@ The "jpm-h2o" branch adds net production of H2O as a buildup species.
 
 8) O
 
-9) HNO3
+9) O2 (net production and loss)
 
-10) CO
+10) HNO3
 
-11) H2
+11) CO
 
-12) H2O
+12) H2
+
+13) H2O
 
 # Other Information
 This mechanism was written in Julia Version 1.2.0 on a macOS (x86_64-apple-darwin18.6.0) and last tested with Julia v1.8.1. Full documentation is contained within the .jl files.
