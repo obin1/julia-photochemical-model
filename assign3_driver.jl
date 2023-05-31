@@ -110,8 +110,8 @@ The original comments and file description are below.
         #      tempk = 283.
         #      press = 0.7
         global rk = getrk!(tempk,press,rk)
-        println("rk: ", rk)
-        println("P = ",press,", T = ",tempk)
+        # println("rk: ", rk)
+        # println("P = ",press,", T = ",tempk)
 
         # make sure ss species are also printed at the beginning
         global s, r, fr, rlr = difun!(constn,c,rpssa,rk,r,fr,rlr)
