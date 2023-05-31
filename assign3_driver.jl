@@ -56,7 +56,7 @@ The original comments and file description are below.
 # names for active species.
 #    name = ["O3", "NO", "NO2","HCHO","HO2.","HO2H","HO.","O","HNO3","CO","H2"]
     constn[1] = Float32(2.09e+05) # O2 concentration in ppm
-    num_buildup = 12 # adding h2o to buildup species
+    num_buildup = maxact+maxbo # adding h2o to buildup species
 
 
 # get the reaction rate constants at 1 atm and 25C--
@@ -119,7 +119,7 @@ The original comments and file description are below.
         # print("steady state species at beginning: ",s)
         c[7] = s[1]
         c[8] = s[2]
-        c[9:num_buildup] = zeros(Float64,1,4)     # buildup species start at zero
+        c[maxact+1:num_buildup] = zeros(Float64,1,4)     # buildup species start at zero
 
 
         daymax = rand(Float64)

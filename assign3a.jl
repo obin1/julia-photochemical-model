@@ -17,9 +17,9 @@ function bldup!(r,dy)
          1) NO2 + HV = NO + O
          2) O + O2 = O3
          3) O3 + NO = NO2 + O2
-         4) HCHO + HV = 2 HO2. + CO
+         4) HCHO + HV + 2 O2 = 2 HO2. + CO
          5) HCHO + HV = H2 + CO
-         6) HCHO + HO. = HO2. + CO + H2O
+         6) HCHO + HO. + O2 = HO2. + CO + H2O
          7) HO2. + NO = HO. + NO2
          8) HO. + NO2 = HNO3
          9) HO2H + HV = 2 HO.
@@ -67,16 +67,16 @@ function  difun!(c,a,s,rk,r,fr,lr)
             a(5) = HO2.
             a(6) = HO2H
      rk  - reaction constants for the mechanism
-            1) NO2 + HV = NO + O
-            2) O + O2 = O3
-            3) O3 + NO = NO2 + O2
-            4) HCHO + HV = 2 HO2. + CO
-            5) HCHO + HV = H2 + CO
-            6) HCHO + HO. = HO2. + CO + H2O
-            7) HO2. + NO = HO. + NO2
-            8) HO. + NO2 = HNO3
-            9) HO2H + HV = 2 HO.
-           10) HO2H + HO. = H2O + HO2.
+         1) NO2 + HV = NO + O
+         2) O + O2 = O3
+         3) O3 + NO = NO2 + O2
+         4) HCHO + HV + 2 O2 = 2 HO2. + CO
+         5) HCHO + HV = H2 + CO
+         6) HCHO + HO. + O2 = HO2. + CO + H2O
+         7) HO2. + NO = HO. + NO2
+         8) HO. + NO2 = HNO3
+         9) HO2H + HV = 2 HO.
+        10) HO2H + HO. = H2O + HO2.
 
     Outputs:
      s   - steady state species concentrations
@@ -137,6 +137,9 @@ function  difun!(c,a,s,rk,r,fr,lr)
      # HO2H
      fr[6] = 0.0
 
+     # net production of O2
+     fr[9] = r[3]
+
      # DEFINE LOSS RATES OF ACTIVE species
 
      # O3
@@ -156,5 +159,9 @@ function  difun!(c,a,s,rk,r,fr,lr)
 
      # HO2H
      lr[6] =  rk[9]*c[2]+rk[10]*s[1]
+
+     # net loss of O2
+     # just reaction rates because dummy prod/loss "concentration" does not influence rates 
+     lr[9] = r[2] + 2*r[4] + r[6] 
      return s,r,fr,lr
  end

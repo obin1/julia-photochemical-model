@@ -60,11 +60,13 @@ Written in Julia Version 1.2.0, tested up to 1.4.2
         #       stop 'euler marker1'
 
         c .= c .+ f*dt
+        pl_O2 = c[9]
         if any(c.<0.0)
             c[c.<0] .= 0
             #s_aggregate[1] = NaN  # Added March 2020: marker to show mass balance violation
             #println("Mass balance prob")
         end
+        c[9] = pl_O2 # net production/loss of oxygen can be negative (full atom balance)
 
         Time = Time + dt
         s_aggregate = s_aggregate .+ r.*dt
@@ -118,6 +120,7 @@ function diff!(c,f,n)
 
 # calculate the net rate of reaction for active species
     f[1:maxact] .= fr[1:maxact] .- rlr[1:maxact].*c[1:maxact]
+    f[maxact] = fr[maxact] - rlr[maxact] # net PL of oxygen is not factored into its loss rate
     return f,s
 end
 

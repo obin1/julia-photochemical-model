@@ -19,13 +19,13 @@ function getrk!(tempk,press,rk)
          1) NO2 + HV = NO + O
          2) O + O2 = O3
          3) O3 + NO = NO2 + O2
-         4) HCHO + HV = 2 HO2. + CO
+         4) HCHO + HV + 2 O2 = 2 HO2. + CO
          5) HCHO + HV = H2 + CO
-         6) HCHO + HO. = HO2. + CO + H2O
+         6) HCHO + HO. + O2 = HO2. + CO + H2O
          7) HO2. + NO = HO. + NO2
          8) HO. + NO2 = HNO3
          9) HO2H + HV = 2 HO.
-        10) HO2H + HO. = HO2. + H2O
+        10) HO2H + HO. = H2O + HO2.
 
  It is assumed that the photolytic constants are set at a constant value
  appropriate for mid-day in Southern California.

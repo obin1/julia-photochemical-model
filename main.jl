@@ -30,37 +30,24 @@ for air quality and climate modeling: https://doi.org/10.5194/gmd-13-4435-2020
          6) HO2H
          7) HO.
          8) O
+         9) PL_O2 (net production and loss of O2 for atom accounting)
          9) HNO3
         10) CO
         11) H2
         12) H2O
 
+
  S corresponds to the following reactions:
          1) NO2 + HV = NO + O
          2) O + O2 = O3
          3) O3 + NO = NO2 + O2
-         4) HCHO + HV = 2 HO2. + CO
+         4) HCHO + HV + 2 O2 = 2 HO2. + CO
          5) HCHO + HV = H2 + CO
-         6) HCHO + HO. = HO2. + CO + H2O
+         6) HCHO + HO. + O2 = HO2. + CO + H2O
          7) HO2. + NO = HO. + NO2
          8) HO. + NO2 = HNO3
          9) HO2H + HV = 2 HO.
-        10) HO2H + HO. = H2O + HO2
-The stoichiometry matrix A, which can also be interpreted as the directed,
-weighted incidence matrix of the species-reaction network, is
-
-A =           [0  1 -1  0  0  0  0  0  0  0;
-               1  0 -1  0  0  0 -1  0  0  0;
-              -1  0  1  0  0  0  1 -1  0  0;
-               0  0  0 -1 -1 -1  0  0  0  0;
-               0  0  0  2  0  1 -1  0  0  1;
-               0  0  0  0  0  0  0  0 -1 -1;
-               0  0  0  0  0 -1  1 -1  2 -1;
-               1 -1  0  0  0  0  0  0  0  0;
-               0  0  0  0  0  0  0  1  0  0;
-               0  0  0  1  1  1  0  0  0  0;
-               0  0  0  0  1  0  0  0  0  0;
-               0  0  0  0  0  1  0  0  0  1]
+        10) HO2H + HO. = H2O + HO2.
 ****************************************************************************=#
 
 mechanism = include("assign3_driver.jl") # Include photochemical mechanism module
@@ -79,13 +66,13 @@ C,S,J,T,P,K = mechanism.gas(0.0,1*20.0,Float64(1.0e-2),num_exp) # mechanism.gas(
 
 Cday = repeat(1:num_exp, inner = 2001)
 Ctime = repeat(collect(0.0:1.0e-2:20.0), outer = num_exp)
-Clabel = permutedims(["Day","Time [min]","T [K]","P [atm]","O3","NO","NO2","HCHO","HO2.","HO2H","OH.","O","HNO3","CO","H2","H2O"])
+Clabel = permutedims(["Day","Time [min]","T [K]","P [atm]","O3","NO","NO2","HCHO","HO2.","HO2H","OH.","O","PL_O2","HNO3","CO","H2","H2O"])
 X = vcat(Clabel, hcat(Cday,Ctime,repeat(T[:,1],inner=2001),repeat(P[:,1],inner=2001),C))
 
 # To write model output to CSV
-#   open("X_Ziming.txt", "w") do io
-#                           writedlm(io, X,',')
-#                    end
+  open("X_o2_h2o.txt", "w") do io
+                          writedlm(io, X,',')
+                   end
 
 # delC = diff([C ; zeros(1,11)],dims = 1)
 
@@ -99,20 +86,6 @@ X = vcat(Clabel, hcat(Cday,Ctime,repeat(T[:,1],inner=2001),repeat(P[:,1],inner=2
 #                          writedlm(io, J,',')
 #                    end
 # V_old = readdlm("V.txt",' ')     
-
-
-A =           [0  1 -1  0  0  0  0  0  0  0;
-               1  0 -1  0  0  0 -1  0  0  0;
-              -1  0  1  0  0  0  1 -1  0  0;
-               0  0  0 -1 -1 -1  0  0  0  0;
-               0  0  0  2  0  1 -1  0  0  1;
-               0  0  0  0  0  0  0  0 -1 -1;
-               0  0  0  0  0 -1  1 -1  2 -1;
-               1 -1  0  0  0  0  0  0  0  0;
-               0  0  0  0  0  0  0  1  0  0;
-               0  0  0  1  1  1  0  0  0  0;
-               0  0  0  0  1  0  0  0  0  0;
-               0  0  0  0  0  1  0  0  0  1]
 
 
 # V = vcat([ 3.49497182e-11, -5.44313032e-11, -1.94818953e-11, -7.07106781e-01,
@@ -143,11 +116,12 @@ A =           [0  1 -1  0  0  0  0  0  0  0;
 # plot(p1, p2, layout=(1,2))
 # savefig("CQ3_varyingTP.pdf")
 
-HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0]
-HN = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0]
-HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 2, 2]
+HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0]
+HN = [0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+HH = [0, 0, 0, 2, 1, 2, 1, 0, 0, 1, 0, 2, 2]
+HO = [3, 1, 2, 1, 2, 2, 1, 1, 2, 3, 1, 0, 1]
 CQ4 = [ 0.41397873, -0.3040862 ,  0.10989254,  0.08430112,  0.49827986,
-0.16860225,  0.08430112,  0.41397873,  0.19419366, -0.08430112,
+0.16860225,  0.08430112,  0.41397873, 0, 0.19419366, -0.08430112,
 -0.39591421, -0.24537649]
 # HH[7] = 0 # excluding OH, hydrogen is much better conserved
 
@@ -155,6 +129,7 @@ CQ4 = [ 0.41397873, -0.3040862 ,  0.10989254,  0.08430112,  0.49827986,
 cvC = zeros(num_exp)
 cvN = zeros(num_exp)
 cvH = zeros(num_exp)
+cvO = zeros(num_exp)
 cv1 = zeros(num_exp)
 cv2 = zeros(num_exp)
 cv4 = zeros(num_exp)
@@ -165,6 +140,7 @@ for i = 1:num_exp
         cvC[i] = std(c_exp*HC) / abs(mean(c_exp*HC))
         cvN[i] = std(c_exp*HN) / abs(mean(c_exp*HN))
         cvH[i] = std(c_exp*HH) / abs(mean(c_exp*HH))
+        cvO[i] = std(c_exp*HO) / abs(mean(c_exp*HO))
         # cv1[i] = std(c_exp*V[1,:]) / abs(mean(c_exp*V[1,:]))
         # cv2[i] = std(c_exp*V[2,:]) / abs(mean(c_exp*V[2,:]))
         cv4[i] = std(c_exp*CQ4) / abs(mean(c_exp*CQ4))
