@@ -83,9 +83,9 @@ Clabel = permutedims(["Day","Time [min]","T [K]","P [atm]","O3","NO","NO2","HCHO
 X = vcat(Clabel, hcat(Cday,Ctime,repeat(T[:,1],inner=2001),repeat(P[:,1],inner=2001),C))
 
 # To write model output to CSV
-#   open("X_Ziming.txt", "w") do io
-#                           writedlm(io, X,',')
-#                    end
+  open("X_h2o.txt", "w") do io
+                          writedlm(io, X,',')
+                   end
 
 # delC = diff([C ; zeros(1,11)],dims = 1)
 
