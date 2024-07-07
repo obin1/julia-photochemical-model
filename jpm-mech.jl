@@ -39,26 +39,26 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
 
     # Reaction rate constants
 
-    # Reaction 2 is O + O2 → O3
-    # updated June 2024, JPL 19-5 page 434 Table 2-1
+    # Old reaection 2 was O + O2 → O3
+    # removed June 2024, JPL 19-5 page 434 Table 2-1
     # original was rkppmmin(6.0e-34 * ( tempk/300. )^(-2.3) * 7.34e+21 * press / tempk, press, tempk)
-    rk2(tempk,press) = molcm3frompressure(tempk,press)*6.1e-34*(tempk/298)^(-2.4)
+    # rk2(tempk,press) = molcm3frompressure(tempk,press)*6.1e-34*(tempk/298)^(-2.4)
 
-    # Reaction 3 is O3 + NO → NO2 + O2
+    # Reaction 2 is O3 + NO → NO2 + O2
     # updated June 2024, JPL 19-5 page 84 Table 1C 
     # original was rkppmmin(2.e-12 * exp(-1400/tempk), press, tempk)
-    rk3(tempk) = arrhenius(3.0e-12,1500,tempk) 
+    rk2(tempk) = arrhenius(3.0e-12,1500,tempk) 
 
-    # Reaction 6 is HCHO + HO + O2 → HO2 + CO + H2O
+    # Reaction 5 is HCHO + HO + O2 → HO2 + CO + H2O
     # Kept original rate rkppmmin(1.2e-14 * tempk^1 * exp(+287/tempk), press, tempk)
-    rk6(tempk) = tempk*arrhenius(1.2e-14,-287,tempk)
+    rk5(tempk) = tempk*arrhenius(1.2e-14,-287,tempk)
 
-    # Reaction 7 is HO2 + NO → HO + NO2
+    # Reaction 6 is HO2 + NO → HO + NO2
     # updated June 2024, JPL 19-5 page 83 Table 1C
     # original was rk7(press, tempk) = rkppmmin(3.7e-12 * exp(+250/tempk), press, tempk)
-    rk7(tempk) = arrhenius(3.44e-12,-260,tempk)
+    rk6(tempk) = arrhenius(3.44e-12,-260,tempk)
 
-    # Reaction 8 is HO + NO2 → HNO3
+    # Reaction 7 is HO + NO2 → HNO3
     # updated June 2024, JPL 19-5 page 434 Table 2-1
     # the original rate is below
     # function rk8(press, tempk)
@@ -69,13 +69,13 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     #     rk8 = rk0 * rm * rb / (1.0 + rk0*rm/rki)
     #     rk8 = rkppmmin(rk8,press,tempk)
     # end
-    rk8(tempk,press) = termolecular(1.8e-30,3.0,2.8e-11,0,tempk,press)
+    rk7(tempk,press) = termolecular(1.8e-30,3.0,2.8e-11,0,tempk,press)
 
     # Reaction 10 is HO2H + HO → H2O + HO2
     # updated June 2024, JPL 19-5 page 73
     # "the recommendation is a temperature independent value of 1.8e-12 cm3 molec-1 s-1"
     # original was rkppmmin(3.3e-12 * exp(-200.0/tempk),press,tempk)
-    rk10() = 1.8e-12
+    rk9() = 1.8e-12
 
     # hv(t) = abs(ceil(0.1*sin(t/720*pi - pi/2)))
     # hv_1(t) = max(sin((t+hv_shift)/720*pi - pi/2),0.0)
@@ -83,25 +83,24 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # hv(t) = hv_1(t) * 0.9 + hv_2(t) * 0.1
 
 # Set the value of hv
-hv = 1/60 #0 # 60.0*1e40
+hv = 1/60 # convert to seconds
 
 # Evaluate the rate constant functions to get their values
-p = [hv, rk2(press,tempk), rk3(tempk), rk6(tempk), 
-    rk7(tempk), rk8(press,tempk), rk10()]
+p = [hv, rk2(tempk), rk5(tempk), 
+    rk6(tempk), rk7(press,tempk), rk9()]
 
 
 rn = @reaction_network begin
-    0.5 * hv, NO2 → NO + O3 + O
-    # rk2, O + O2 → O3  # keep oxygen in this rate law
-    rk3, O3 + NO → NO2 + O2
+    0.5 * hv, NO2 → NO + O3
+    rk2, O3 + NO → NO2 + O2
     0.015  * hv / O2^2, HCHO + 2O2 → 2HO2 + CO  # rate law not proportional to O2
     # 0.015  * hv, HCHO → 2HO2 + CO 
     0.022  * hv, HCHO → H2 + CO
-    rk6 / O2, HCHO + HO + O2 → HO2 + CO + H2O # rate law not proportional to O2
-    rk7, HO2 + NO → HO + NO2
-    rk8, HO + NO2 → HNO3
+    rk5 / O2, HCHO + HO + O2 → HO2 + CO + H2O # rate law not proportional to O2
+    rk6, HO2 + NO → HO + NO2
+    rk7, HO + NO2 → HNO3
     0.0003  * hv, HO2H → 2HO
-    rk10, HO2H + HO → H2O + HO2
+    rk9, HO2H + HO → H2O + HO2
 end hv rk2 rk3 rk6 rk7 rk8 rk10
 
     nspecs = size(species(rn),1)
@@ -119,7 +118,6 @@ end hv rk2 rk3 rk6 rk7 rk8 rk10
     atoms[specmap["HO2"], :] = [0 0 1 2]
     atoms[specmap["HO2H"], :] = [0 0 2 2]
     atoms[specmap["HO"], :] = [0 0 1 1]
-    atoms[specmap["O"], :] = [0 0 0 1]
     atoms[specmap["HNO3"], :] = [0 1 1 3]
     atoms[specmap["CO"], :] = [1 0 0 1]
     atoms[specmap["H2"], :] = [0 0 2 0]
@@ -183,7 +181,8 @@ sol = solve(prob, Rosenbrock23(), saveat=1.0)
 
 # plot O3, NO, NO2, HCHO trajectories
 # Define the variables to plot and get their indices
-vars_to_plot = ["O3", "NO", "NO2", "HCHO"]
+# vars_to_plot = ["O3", "NO", "NO2", "HCHO"]
+vars_to_plot = ["O3", "NO", "NO2", "HCHO", "HO2", "HO2H", "HO", "HNO3", "CO", "H2", "H2O", "O2"]
 indices = [jpm.specmap[var] for var in vars_to_plot]
 # Extract the variables at every time step
 selected_vars = [state[indices] for state in sol.u]
@@ -193,12 +192,18 @@ selected_vars_transposed = transpose(hcat(selected_vars...))
 selected_vars_transposed = molec_cm3_to_ppb.(selected_vars_transposed, tempk, press)
 # Plot each variable as its own subplot
 # Create a new plot with a subplot for each variable
-p = plot(layout = (length(vars_to_plot), 1))
-
+num_vars = length(vars_to_plot)
+fig_height = 200 * num_vars  # Adjust height per variable
+fig_width = 800  # Standard width
+p = plot(layout = (num_vars, 1), size = (fig_width, fig_height))
 # Add each variable to the plot
 for (i, var) in enumerate(vars_to_plot)
     plot!(p[i], sol.t, selected_vars_transposed[:,i],legend=false)
+    # set ylims to be 0 to the max value of the variable
+    ylims!(p[i], (0, maximum(selected_vars_transposed[:,i])))
+    xlabel!(p[i], "Time [seconds]")
     ylabel!(p[i], var * " [ppb]")
+    title!(p[i], var)
 
 end
 display(p)
