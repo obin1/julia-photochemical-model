@@ -81,16 +81,18 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # hv_1(t) = max(sin((t+hv_shift)/720*pi - pi/2),0.0)
     # hv_2(t) = max((sin((t+hv_shift)/720*pi - pi/2) + 1.0) / 2.0,0.0)
     # hv(t) = hv_1(t) * 0.9 + hv_2(t) * 0.1
-# Evaluate the rate constant functions to get their values
-p = [rk2(press,tempk), rk3(tempk), rk6(tempk), 
-    rk7(tempk), rk8(press,tempk), rk10()]
 
 # Set the value of hv
-hv = 60.0
+hv = 1/60 #0 # 60.0*1e40
+
+# Evaluate the rate constant functions to get their values
+p = [hv, rk2(press,tempk), rk3(tempk), rk6(tempk), 
+    rk7(tempk), rk8(press,tempk), rk10()]
+
 
 rn = @reaction_network begin
-    0.5 * hv, NO2 → NO + O
-    rk2, O + O2 → O3  # keep oxygen in this rate law
+    0.5 * hv, NO2 → NO + O3 + O
+    # rk2, O + O2 → O3  # keep oxygen in this rate law
     rk3, O3 + NO → NO2 + O2
     0.015  * hv / O2^2, HCHO + 2O2 → 2HO2 + CO  # rate law not proportional to O2
     # 0.015  * hv, HCHO → 2HO2 + CO 
@@ -150,19 +152,26 @@ ChemSys(press=1.0::Real, tempk=298.0::Real) = ChemSys(newmodel(press, tempk)...)
 jpm = ChemSys()
 graph = Graph(jpm.rn)
 
+
 # initialize c0
 c0 = zeros(Float64,length(jpm.specmap))
-c0[jpm.specmap["O3"], :] .= .02 + 0.001*10^(2*rand())   # 03 range: 0.021 - 0.12 ppm
-c0[jpm.specmap["NO"], :] .= 0.0015*10^(2*rand())        # NO range: 0.0015 - 0.15
-c0[jpm.specmap["NO2"], :] .= 0.0015*10^(2*rand())       # NO2 range: 0.0015 - 0.15
-c0[jpm.specmap["HCHO"], :] .= 0.02*10^(2*rand())        # HCHO range: 0.02 - 2 ppm
-c0[jpm.specmap["HO2"], :] .= 1.0e-05 * rand()           # HO2. range: 1 - 10 *ppt*
-c0[jpm.specmap["HO2H"], :] .= 0.01*rand()	            # HO2H range: 0.001 - 0.01 ppm
+# c0[jpm.specmap["O3"], :] .= .02 + 0.001*10^(2*rand())   # 03 range: 0.021 - 0.12 ppm
+# c0[jpm.specmap["NO"], :] .= 0.0015*10^(2*rand())        # NO range: 0.0015 - 0.15
+# c0[jpm.specmap["NO2"], :] .= 0.0015*10^(2*rand())       # NO2 range: 0.0015 - 0.15
+# c0[jpm.specmap["HCHO"], :] .= 0.02*10^(2*rand())        # HCHO range: 0.02 - 2 ppm
+# c0[jpm.specmap["HO2"], :] .= 1.0e-05 * rand()           # HO2. range: 1 - 10 *ppt*
+# c0[jpm.specmap["HO2H"], :] .= 0.01*rand()	            # HO2H range: 0.001 - 0.01 ppm
 c0[jpm.specmap["O2"], :] .= 0.21e6	                    # O2: 0.21e6 ppm
-c0 = ppb_to_molec_cm3.(c0*1e3, tempk, press)
-# calculate the steady state species concentrations and 
 
-# c0[jpm.specmap["O"], :] = 
+# Initialize concentrations from uniform distribution, ranges per SI of https://doi.org/10.1029/2020JD032759
+c0[jpm.specmap["O3"], :]   .= 100*rand()*1e-3            
+c0[jpm.specmap["NO"], :]   .= 10*rand()*1e-3     
+c0[jpm.specmap["NO2"], :]  .= 10*rand()*1e-3
+c0[jpm.specmap["HCHO"], :] .= 20*rand()*1e-3    
+c0[jpm.specmap["HO2"], :]  .= 0.5*rand()*1e-3
+c0[jpm.specmap["HO2H"], :] .= 10*rand()*1e-3     
+c0 = ppb_to_molec_cm3.(c0*1e3, tempk, press)
+
 
 tspan = (0, 900)
 prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
