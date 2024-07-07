@@ -1,0 +1,8 @@
+[deps]
+Catalyst = "479239e8-5488-4da2-87a7-35f2df7eef83"
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+GraphRecipes = "bd48cda9-67a9-57be-86fa-5b3c104eda73"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Surrogates = "6fc51010-71bc-11e9-0e15-a3fcc6593c49"
