@@ -69,105 +69,114 @@ using Measures # for cleaner figure margins
 # Note: currently configured for Ziming, see photolytic constant set on:
         # euler.jl line 53
         # assign3_driver.jl line 106
-num_exp = 1000
-C,S,J,T,P,K = mechanism.gas(0.0,1*20.0,Float64(1.0e-2),num_exp) # mechanism.gas(0.0,24.0*60.0,60.0,5000) # Run 5000 full days, sampling every 6 minutes
+num_exp = 1
+C,S,J,T,P,K = mechanism.gas(0.0,1*15.0,Float64(1.0e-2),num_exp) # mechanism.gas(0.0,24.0*60.0,60.0,5000) # Run 5000 full days, sampling every 6 minutes
+# convert to ppb from ppm
+C = C .* 1e3
+# plot the first 4 species
+p1 = plot(C[:,1],title="O3",xlabel="Time [min]",ylabel="O3 [ppb]",legend=false)
+p2 = plot(C[:,2],title="NO",xlabel="Time [min]",ylabel="NO [ppb]",legend=false)
+p3 = plot(C[:,3],title="NO2",xlabel="Time [min]",ylabel="NO2 [ppb]",legend=false)
+p4 = plot(C[:,4],title="HCHO",xlabel="Time [min]",ylabel="HCHO [ppb]",legend=false)
+# combine into a single plot
+plot(p1,p2,p3,p4,layout=(4,1),size=(800,600))
 
-Cday = repeat(1:num_exp, inner = 2001)
-Ctime = repeat(collect(0.0:1.0e-2:20.0), outer = num_exp)
-Clabel = permutedims(["Day","Time [min]","T [K]","P [atm]","O3","NO","NO2","HCHO","HO2.","HO2H","OH.","O","HNO3","CO","H2"])
-X = vcat(Clabel, hcat(Cday,Ctime,repeat(T[:,1],inner=2001),repeat(P[:,1],inner=2001),C))
+# Cday = repeat(1:num_exp, inner = 2001)
+# Ctime = repeat(collect(0.0:1.0e-2:20.0), outer = num_exp)
+# Clabel = permutedims(["Day","Time [min]","T [K]","P [atm]","O3","NO","NO2","HCHO","HO2.","HO2H","OH.","O","HNO3","CO","H2"])
+# X = vcat(Clabel, hcat(Cday,Ctime,repeat(T[:,1],inner=2001),repeat(P[:,1],inner=2001),C))
 
-# To write model output to CSV
-  open("X.txt", "w") do io
-                          writedlm(io, X,',')
-                   end
-
-# delC = diff([C ; zeros(1,11)],dims = 1)
-
-#   open("S_Ziming.txt", "w") do io
-#                          writedlm(io, S,',')
+# # To write model output to CSV
+#   open("X.txt", "w") do io
+#                           writedlm(io, X,',')
 #                    end
-#   open("C_Ziming.csv", "w") do io
-#                           writedlm(io, C,',')
-#                    end
-#   open("J_Ziming.txt", "w") do io
-#                          writedlm(io, J,',')
-#                    end
-# V_old = readdlm("V.txt",' ')     
+
+# # delC = diff([C ; zeros(1,11)],dims = 1)
+
+# #   open("S_Ziming.txt", "w") do io
+# #                          writedlm(io, S,',')
+# #                    end
+# #   open("C_Ziming.csv", "w") do io
+# #                           writedlm(io, C,',')
+# #                    end
+# #   open("J_Ziming.txt", "w") do io
+# #                          writedlm(io, J,',')
+# #                    end
+# # V_old = readdlm("V.txt",' ')     
 
 
-A =           [0  1 -1  0  0  0  0  0  0  0;
-               1  0 -1  0  0  0 -1  0  0  0;
-              -1  0  1  0  0  0  1 -1  0  0;
-               0  0  0 -1 -1 -1  0  0  0  0;
-               0  0  0  2  0  1 -1  0  0  1;
-               0  0  0  0  0  0  0  0 -1 -1;
-               0  0  0  0  0 -1  1 -1  2 -1;
-               1 -1  0  0  0  0  0  0  0  0;
-               0  0  0  0  0  0  0  1  0  0;
-               0  0  0  1  1  1  0  0  0  0;
-               0  0  0  0  1  0  0  0  0  0]
+# A =           [0  1 -1  0  0  0  0  0  0  0;
+#                1  0 -1  0  0  0 -1  0  0  0;
+#               -1  0  1  0  0  0  1 -1  0  0;
+#                0  0  0 -1 -1 -1  0  0  0  0;
+#                0  0  0  2  0  1 -1  0  0  1;
+#                0  0  0  0  0  0  0  0 -1 -1;
+#                0  0  0  0  0 -1  1 -1  2 -1;
+#                1 -1  0  0  0  0  0  0  0  0;
+#                0  0  0  0  0  0  0  1  0  0;
+#                0  0  0  1  1  1  0  0  0  0;
+#                0  0  0  0  1  0  0  0  0  0]
 
 
-V = vcat([ 3.49497182e-11, -5.44313032e-11, -1.94818953e-11, -7.07106781e-01,
-         5.24143203e-11,  3.49495370e-11,  1.74603652e-11,  3.49498516e-11,
-        -2.01927364e-12, -7.07106781e-01, -1.26962632e-11]',
-        [ 4.32105740e-13,  5.77350269e-01,  5.77350269e-01, -3.07830081e-11,
-         6.47877585e-13,  4.32966163e-13,  2.16420631e-13,  4.32237579e-13,
-         5.77350269e-01, -3.12153220e-11, -1.56357566e-13]',
-        [-0.37014454,  0.30845379, -0.06169076, -0.18507227, -0.55521681,
-        -0.37014454, -0.18507227, -0.37014454, -0.24676303,  0.18507227,
-         0.13459802]')
+# V = vcat([ 3.49497182e-11, -5.44313032e-11, -1.94818953e-11, -7.07106781e-01,
+#          5.24143203e-11,  3.49495370e-11,  1.74603652e-11,  3.49498516e-11,
+#         -2.01927364e-12, -7.07106781e-01, -1.26962632e-11]',
+#         [ 4.32105740e-13,  5.77350269e-01,  5.77350269e-01, -3.07830081e-11,
+#          6.47877585e-13,  4.32966163e-13,  2.16420631e-13,  4.32237579e-13,
+#          5.77350269e-01, -3.12153220e-11, -1.56357566e-13]',
+#         [-0.37014454,  0.30845379, -0.06169076, -0.18507227, -0.55521681,
+#         -0.37014454, -0.18507227, -0.37014454, -0.24676303,  0.18507227,
+#          0.13459802]')
 
-CQ3_snapped = [-6, 5, -1, -3, -9, -6, -3, -6, -4, 3, 2.213115]
-# CQ3_snapped = [-6, 5, -1, -3, -9, -6, -3, -6, -4, 3, 2]
-
-
-experiment = 34 #21 #3 might be good 30 and 32 is interesting
-p1 = visualizeCQ(C[2001*(experiment-1)+1:2001*experiment,:],V,
-                title="P="*string(round(100*P[experiment])/100)*"atm, T="*string(round(T[experiment]-273.15))*"˚C")
+# CQ3_snapped = [-6, 5, -1, -3, -9, -6, -3, -6, -4, 3, 2.213115]
+# # CQ3_snapped = [-6, 5, -1, -3, -9, -6, -3, -6, -4, 3, 2]
 
 
-experiment = 60 #40, 35 might be good
-p2 = visualizeCQ(C[2001*(experiment-1)+1:2001*experiment,:],V,
-                 title="P="*string(round(100*P[experiment])/100)*"atm, T="*string(round(T[experiment]-273.15))*"˚C",
-                 legend=false)
+# experiment = 34 #21 #3 might be good 30 and 32 is interesting
+# p1 = visualizeCQ(C[2001*(experiment-1)+1:2001*experiment,:],V,
+#                 title="P="*string(round(100*P[experiment])/100)*"atm, T="*string(round(T[experiment]-273.15))*"˚C")
 
 
-plot(p1, p2, layout=(1,2))
-savefig("CQ3_varyingTP.pdf")
+# experiment = 60 #40, 35 might be good
+# p2 = visualizeCQ(C[2001*(experiment-1)+1:2001*experiment,:],V,
+#                  title="P="*string(round(100*P[experiment])/100)*"atm, T="*string(round(T[experiment]-273.15))*"˚C",
+#                  legend=false)
 
-HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]
-HN = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0]
-# HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 2]
 
-# CV's are coefficients of variation (standard deviation divided by the mean)
-cvC = zeros(num_exp)
-cvN = zeros(num_exp)
-cv1 = zeros(num_exp)
-cv2 = zeros(num_exp)
-cv3 = zeros(num_exp)
-cv3_snapped = zeros(num_exp)
+# plot(p1, p2, layout=(1,2))
+# savefig("CQ3_varyingTP.pdf")
 
-for i = 1:num_exp
-        c_exp = X[X[:,1].==i,5:end] # C[2001*(i-1)+1:2001*i,:] #
-        cvC[i] = std(c_exp*HC) / abs(mean(c_exp*HC))
-        cvN[i] = std(c_exp*HN) / abs(mean(c_exp*HN))
-        cv1[i] = std(c_exp*V[1,:]) / abs(mean(c_exp*V[1,:]))
-        cv2[i] = std(c_exp*V[2,:]) / abs(mean(c_exp*V[2,:]))
-        cv3[i] = std(c_exp*V[3,:]) / abs(mean(c_exp*V[3,:]))
-        cv3_snapped[i] = std(c_exp*CQ3_snapped) / abs(mean(c_exp*CQ3_snapped))
-end
+# HC = [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0]
+# HN = [0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0]
+# # HH = [0, 0, 0, 2, 1, 2, 1, 0, 1, 0, 2]
 
-# Maximum cv for each CQ, as well as 95 percentile, in percent
-cv3_max = maximum(cv3)*100
-cv3_95 = percentile(cv3,95)*100
-cv3_50 = percentile(cv3,50)*100
+# # CV's are coefficients of variation (standard deviation divided by the mean)
+# cvC = zeros(num_exp)
+# cvN = zeros(num_exp)
+# cv1 = zeros(num_exp)
+# cv2 = zeros(num_exp)
+# cv3 = zeros(num_exp)
+# cv3_snapped = zeros(num_exp)
 
-h1 = histogram(cv1*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ1")
-h2 = histogram(cv2*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ2")
-h3 = histogram(cv3*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ3")
-hall = plot(h1,h2,h3,size=(12e2,7e2))
-plot!(margin=5mm)
-savefig("histogram_relativevariation.pdf")
+# for i = 1:num_exp
+#         c_exp = X[X[:,1].==i,5:end] # C[2001*(i-1)+1:2001*i,:] #
+#         cvC[i] = std(c_exp*HC) / abs(mean(c_exp*HC))
+#         cvN[i] = std(c_exp*HN) / abs(mean(c_exp*HN))
+#         cv1[i] = std(c_exp*V[1,:]) / abs(mean(c_exp*V[1,:]))
+#         cv2[i] = std(c_exp*V[2,:]) / abs(mean(c_exp*V[2,:]))
+#         cv3[i] = std(c_exp*V[3,:]) / abs(mean(c_exp*V[3,:]))
+#         cv3_snapped[i] = std(c_exp*CQ3_snapped) / abs(mean(c_exp*CQ3_snapped))
+# end
+
+# # Maximum cv for each CQ, as well as 95 percentile, in percent
+# cv3_max = maximum(cv3)*100
+# cv3_95 = percentile(cv3,95)*100
+# cv3_50 = percentile(cv3,50)*100
+
+# h1 = histogram(cv1*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ1")
+# h2 = histogram(cv2*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ2")
+# h3 = histogram(cv3*1e2,xlabel = "coefficient of variation [%]", ylabel = "number of cases",title="CQ3")
+# hall = plot(h1,h2,h3,size=(12e2,7e2))
+# plot!(margin=5mm)
+# savefig("histogram_relativevariation.pdf")
 
