@@ -1,13 +1,12 @@
 # module JuliaPhotochem
-
+using Measures
 using DifferentialEquations
-using DiffEqBase
 using Catalyst
 using Random
-using Surrogates
 using Plots, GraphRecipes
+using CSV
 
-export ChemSys, random_sims, JPM
+export ChemSys, jpm
 ENV["PATH"] = "/opt/homebrew/bin:" * ENV["PATH"] # to get the graphs.jl access
 press=1.0
 tempk=298.0
@@ -23,8 +22,7 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
 	# These units are valid for bimolecular reactions
     # rkppmmin(rk,press,tempk) = rk * 60.0 *  7.34e+15 * press / tempk 
 
-    # make a function arrhenius(A,ER,tempk) to calculate the rate constant
-    # A is the pre-exponential factor, ER is the activation energy in J/mol, and tempk is the temperature in K
+    # make a function arrhenius(A,(E/R),tempk) to calculate the rate constant
     arrhenius(A,EdivR,tempk) = A * exp(-EdivR/tempk)
     molcm3frompressure(tempk,press) = 6.022e23 * press / (.0821 * tempk) / 1e3 # 6.022e23 is Avogadro's number, .0821 is R in L atm K-1 mol-1, and there are 1e3 cm3 in a L
     function termolecular(k₀298,n, k∞298, m, tempk,press)
@@ -41,41 +39,51 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
 
     # Reaction rate constants
 
-    # Old reaction 2 was O + O2 → O3
+    # Old reaction 2 was O + O₂ → O₃
     # removed July 2024, JPL 19-5 page 434 Table 2-1
     # original was rkppmmin(6.0e-34 * ( tempk/300. )^(-2.3) * 7.34e+21 * press / tempk, press, tempk)
     # rk2(tempk,press) = molcm3frompressure(tempk,press)*6.1e-34*(tempk/298)^(-2.4)
 
-    # Reaction 1 is NO2 → NO + O3
-    # photolysis reaction with rate constant taken from original mechanism
-    rk1(hv) = 0.5 * hv / 60 # converting to seconds
+    # Reaction 1 is NO₂ → NO + O₃
+    # photolysis reaction, rate constant from original mechanism
+    # rk1(hv) = 0.5 * hv / 60 # converting to seconds
+    # this is a photolysis reaction with rate constant sampled from the GEOS-CF
+    # chemical state at the surface of Los Angeles, using the KPP Standalone interface
+    rk1(hv) = 9.258186912960969E-003 * hv
 
-    # Reaction 2 is O3 + NO → NO2 + O2
+    # Reaction 2 is O₃ + NO → NO₂ + O₂
     # updated July 2024, JPL 19-5 page 84 Table 1C 
     # original was rkppmmin(2.e-12 * exp(-1400/tempk), press, tempk)
     rk2(tempk) = arrhenius(3.0e-12,1500,tempk) 
 
-    # Reaction 3 is HCHO + O2 → HO2 + CO
-    # photolysis reaction with rate constant taken from original mechanism
-    rk3(hv) = 0.015 * hv / 60 # converting to seconds
+    # Reaction 3 is HCHO + O₂ → HO₂ + CO
+    # photolysis reaction, rate constant taken from original mechanism
+    # rk3(hv) = 0.015 * hv / 60 # converting to seconds
+    # this is a photolysis reaction with rate constant sampled from the GEOS-CF
+    # chemical state at the surface of Los Angeles, using the KPP Standalone interface
+    rk3(hv) = 3.442262702424394E-005 * hv
 
-    # Reaction 4 is HCHO → H2 + CO
-    # photolysis reaction with rate constant taken from original mechanism
-    rk4(hv) = 0.022 * hv / 60 # converting to seconds
+    # Reaction 4 is HCHO → H₂ + CO
+    # photolysis reaction, rate constant from original mechanism
+    # rk4(hv) = 0.022 * hv / 60 # converting to seconds
+    # this is a photolysis reaction with rate constant sampled from the GEOS-CF
+    # chemical state at the surface of Los Angeles, using the KPP Standalone interface
+    rk4(hv) = 5.132233465281091E-005 * hv
 
-    # Reaction 5 is HCHO + HO + O2 → HO2 + CO + H2O
+
+    # Reaction 5 is HCHO + OH + O₂ → HO₂ + CO + H₂O
     # updated July 2024, JPL 19-5 page 106 Table 1D
-    # OH + H2CO (not HCHO or CH2O, lol) → H2O + HCO 
-    # (formyl radical in oxygen makes HO2 and CO, GEOS-Chem also parameterizes this as instantaneous)
+    # OH + H₂CO (not HCHO or CH₂O, lol) → H₂O + HCO 
+    # (formyl radical in oxygen makes HO₂ and CO, GEOS-Chem also parameterizes this as instantaneous)
     # original rate was rkppmmin(1.2e-14 * tempk^1 * exp(+287/tempk), press, tempk)
     rk5(tempk) = arrhenius(5.5e-12,-125.0,tempk)
 
-    # Reaction 6 is HO2 + NO → HO + NO2
+    # Reaction 6 is HO₂ + NO → OH + NO₂
     # updated July 2024, JPL 19-5 page 83 Table 1C
     # original was rk7(press, tempk) = rkppmmin(3.7e-12 * exp(+250/tempk), press, tempk)
     rk6(tempk) = arrhenius(3.44e-12,-260,tempk)
 
-    # Reaction 7 is HO + NO2 → HNO3
+    # Reaction 7 is OH + NO₂ → HNO₃
     # updated July 2024, JPL 19-5 page 434 Table 2-1
     # the original rate is below
     # function rk8(press, tempk)
@@ -88,34 +96,37 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # end
     rk7(tempk,press) = termolecular(1.8e-30,3.0,2.8e-11,0,tempk,press)
 
-    # Reaction 8 is HO2H → 2HO
-    # this is a photolysis reaction with rate constant taken from original mechanism
-    rk8(hv) = 0.0003 * hv / 60 # converting to seconds
+    # Reaction 8 is H₂O₂ → 2HO
+    # this is a photolysis reaction, rate constant from original mechanism
+    # rk8(hv) = 0.0003 * hv / 60 # converting to seconds
+    # this is a photolysis reaction with rate constant sampled from the GEOS-CF
+    # chemical state at the surface of Los Angeles, using the KPP Standalone interface
+    rk8(hv) = 7.373314014460711E-006 * hv
 
-    # Reaction 9 is HO2H + HO → H2O + HO2
+    # Reaction 9 is H₂O₂ + OH → H₂O + HO₂
     # updated July 2024, JPL 19-5 page 73
     # "the recommendation is a temperature independent value of 1.8e-12 cm3 molec-1 s-1"
     # original was rkppmmin(3.3e-12 * exp(-200.0/tempk),press,tempk)
     rk9() = 1.8e-12
 
-    # Reaction 10 is ALD2 + OH → MCO3 + H2O
+    # Reaction 10 is ALD2 + OH → MCO₃ + H₂O
     # updated July 2024, JPL 19-5 page 107 Table 1D
     # follows an Arrhenius equation with A = 4.63e-12, E/R = -350
     # note that GCARR_ac has the negative in it already so 
     # this is equivalent to GCARR_ac(4.63d-12, 350.0d0);
     rk10(tempk) = arrhenius(4.63e-12,-350,tempk)
 
-    # Reaction 11 is MGLY + hv → MCO3 + CO + HO2 
+    # Reaction 11 is MGLY + hv → MCO₃ + CO + HO₂ 
     # this is a photolysis reaction with rate constant sampled from the GEOS-CF
     # chemical state at the surface of Los Angeles, using the KPP Standalone interface
     rk11(hv) = 1.863860764162095E-004 * hv 
 
 
-    # Reaction 12 is MCO3 + NO2 {+M} → PAN
+    # Reaction 12 is MCO₃ + NO₂ {+M} → PAN
     # updated July 2024, JPL 19-5 page 435 Table 2-1
     rk12(tempk,press) = termolecular(7.3e-29,4.1,9.5e-12,1.6,tempk,press) 
 
-    # Reaction 13 is thermal decomposition of PAN → MCO3 + NO2 
+    # Reaction 13 is thermal decomposition of PAN → MCO₃ + NO₂ 
     # updated July 2024, JPL 19-5 page 521 Table 3-1
     # using the equilibrium constant divided by the same termolecular function as reaction 12
     # to get the backward rate constant
@@ -124,45 +135,44 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
 
 
 
-# Evaluate the rate constant functions to get their values
-p = [rk1(hv), rk2(tempk), rk3(hv), rk4(hv), rk5(tempk),
-    rk6(tempk), rk7(press,tempk), rk8(hv), rk9(), rk10(tempk), 
-    rk11(hv), rk12(tempk,press), rk13(tempk,press)]
+    # Evaluate the rate constant functions to get their values
+    p = [rk1(hv), rk2(tempk), rk3(hv), rk4(hv), rk5(tempk),
+        rk6(tempk), rk7(press,tempk), rk8(hv), rk9(), rk10(tempk), 
+        rk11(hv), rk12(tempk,press), rk13(tempk,press)]
 
 
-rn = @reaction_network begin
-    rk1/O2, NO2 + O2 → NO + O3
-    rk2, O3 + NO → NO2 + O2
-    rk3/(O2^2), HCHO + 2O2 → 2HO2 + CO  # rate law not proportional to O2
-    rk4, HCHO → H2 + CO
-    rk5/O2, HCHO + HO + O2 → HO2 + CO + H2O # rate law not proportional to O2
-    rk6, HO2 + NO → HO + NO2
-    rk7, HO + NO2 → HNO3
-    rk8, HO2H → 2HO
-    rk9, HO2H + HO → H2O + HO2
-    rk10/O2, ALD2 + HO + O2 → MCO3 + H2O
-    rk11/(O2^2), MGLY + 2O2 → MCO3 + CO + HO2
-    rk12, MCO3 + NO2 → PAN
-    rk13, PAN → MCO3 + NO2
-    # All species go to null
-    # rk2*1e12, NO2 → ∅;
-    # rk5*1e12, NO → ∅;
-    # rk6*1e12, O3 → ∅;
-    # rk7*1e12, HO → ∅;
-    # rk9*1e12, HO2 → ∅;
-    # rk2*1e12, HCHO → ∅;
-    # rk6*1e12, HO2H → ∅;
-    # rk7*1e12, HNO3 → ∅;
-    # rk9*1e12, CO → ∅;
-    # rk12*1e12, H2 → ∅;
-    # rk13*1e12, H2O → ∅;
-    # rk13*1e12, O2 → ∅;
-    # rk12*1e12, MCO3 → ∅;
-    # rk13*1e12, PAN → ∅;
-    # rk13*1e12, ALD2 → ∅;
-    # rk13*1e12, MGLY → ∅;
-
-end rk1 rk2 rk3 rk4 rk5 rk6 rk7 rk8 rk9 rk10 rk11 rk12 rk13
+    rn = @reaction_network begin
+        rk1/O₂, NO₂ + O₂ → NO + O₃
+        rk2, O₃ + NO → NO₂ + O₂
+        rk3/(O₂^2), HCHO + 2O₂ → 2HO₂ + CO  # rate law not proportional to O₂
+        rk4, HCHO → H₂ + CO
+        rk5/O₂, HCHO + OH + O₂ → HO₂ + CO + H₂O # rate law not proportional to O₂
+        rk6, HO₂ + NO → OH + NO₂
+        rk7, OH + NO₂ → HNO₃
+        rk8, H₂O₂ → 2OH
+        rk9, H₂O₂ + OH → H₂O + HO₂
+        rk10/O₂, ALD2 + OH + O₂ → MCO₃ + H₂O
+        rk11/(O₂^2), MGLY + 2O₂ → MCO₃ + CO + HO₂
+        rk12, MCO₃ + NO₂ → PAN
+        rk13, PAN → MCO₃ + NO₂
+        # All species go to null for testing
+        # rk2*1e12, NO₂ → ∅;
+        # rk5*1e12, NO → ∅;
+        # rk6*1e12, O₃ → ∅;
+        # rk7*1e12, OH → ∅;
+        # rk9*1e12, HO₂ → ∅;
+        # rk2*1e12, HCHO → ∅;
+        # rk6*1e12, H₂O₂ → ∅;
+        # rk7*1e12, HNO₃ → ∅;
+        # rk9*1e12, CO → ∅;
+        # rk12*1e12, H₂ → ∅;
+        # rk13*1e12, H₂O → ∅;
+        # rk13*1e12, O₂ → ∅;
+        # rk12*1e12, MCO₃ → ∅;
+        # rk13*1e12, PAN → ∅;
+        # rk13*1e12, ALD2 → ∅;
+        # rk13*1e12, MGLY → ∅;
+    end rk1 rk2 rk3 rk4 rk5 rk6 rk7 rk8 rk9 rk10 rk11 rk12 rk13
 
     nspecs = size(species(rn),1)
 
@@ -172,21 +182,21 @@ end rk1 rk2 rk3 rk4 rk5 rk6 rk7 rk8 rk9 rk10 rk11 rk12 rk13
     end
     natoms = 4 # C N H O
     atoms = zeros(Float64, nspecs, natoms)
-    atoms[specmap["O3"],   :]   = [0 0 0 3]
+    atoms[specmap["O₃"],   :]   = [0 0 0 3]
     atoms[specmap["NO"],   :]   = [0 1 0 1]
-    atoms[specmap["NO2"],  :]   = [0 1 0 2]
+    atoms[specmap["NO₂"],  :]   = [0 1 0 2]
     atoms[specmap["HCHO"], :]   = [1 0 2 1]
-    atoms[specmap["HO2"],  :]   = [0 0 1 2]
-    atoms[specmap["HO2H"], :]   = [0 0 2 2]
-    atoms[specmap["HO"],   :]   = [0 0 1 1]
-    atoms[specmap["HNO3"], :]   = [0 1 1 3]
+    atoms[specmap["HO₂"],  :]   = [0 0 1 2]
+    atoms[specmap["H₂O₂"], :]   = [0 0 2 2]
+    atoms[specmap["OH"],   :]   = [0 0 1 1]
+    atoms[specmap["HNO₃"], :]   = [0 1 1 3]
     atoms[specmap["CO"],   :]   = [1 0 0 1]
-    atoms[specmap["H2"],   :]   = [0 0 2 0]
-    atoms[specmap["H2O"],  :]   = [0 0 2 1]
-    atoms[specmap["O2"],   :]   = [0 0 0 2]
+    atoms[specmap["H₂"],   :]   = [0 0 2 0]
+    atoms[specmap["H₂O"],  :]   = [0 0 2 1]
+    atoms[specmap["O₂"],   :]   = [0 0 0 2]
     atoms[specmap["ALD2"], :]   = [2 0 4 1]
     atoms[specmap["MGLY"], :]   = [3 0 4 2]
-    atoms[specmap["MCO3"], :]   = [2 0 3 3]
+    atoms[specmap["MCO₃"], :]   = [2 0 3 3]
     atoms[specmap["PAN"],  :]   = [2 1 3 5]
 
     return rn, atoms, specmap, p
@@ -210,130 +220,176 @@ function molec_cm3_to_ppb(molec_cm3::Float64, tempk::Float64, press::Float64)
 end
 
 
-
 ChemSys(press=1.0::Real, tempk=298.0::Real) = ChemSys(newmodel(press, tempk)...)
 jpm = ChemSys()
 graph = Graph(jpm.rn)
+# save the graph to a file
+savegraph(graph,"jpm-graph.pdf","pdf")
 
+function plot_trajectories(jpm, tempk, press, vars_to_plot=["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"])
+    # Initialize c0 with zeros
+    c0 = zeros(Float64, length(jpm.specmap))
+    # Set specific initial conditions
+    c0[jpm.specmap["O₂"], :] .= 0.21e6  # O₂: 0.21e6 ppm
 
-# initialize c0
-c0 = zeros(Float64,length(jpm.specmap))
-# c0[jpm.specmap["O3"], :] .= .02 + 0.001*10^(2*rand())   # 03 range: 0.021 - 0.12 ppm
-# c0[jpm.specmap["NO"], :] .= 0.0015*10^(2*rand())        # NO range: 0.0015 - 0.15
-# c0[jpm.specmap["NO2"], :] .= 0.0015*10^(2*rand())       # NO2 range: 0.0015 - 0.15
-# c0[jpm.specmap["HCHO"], :] .= 0.02*10^(2*rand())        # HCHO range: 0.02 - 2 ppm
-# c0[jpm.specmap["HO2"], :] .= 1.0e-05 * rand()           # HO2. range: 1 - 10 *ppt*
-# c0[jpm.specmap["HO2H"], :] .= 0.01*rand()	            # HO2H range: 0.001 - 0.01 ppm
-c0[jpm.specmap["O2"], :] .= 0.21e6	                    # O2: 0.21e6 ppm
+    # Initialize concentrations from uniform distribution
+    c0[jpm.specmap["O₃"], :]   .= 50*rand()         
+    c0[jpm.specmap["NO"], :]   .= 20*rand()   
+    c0[jpm.specmap["NO₂"], :]  .= 20*rand()
+    c0[jpm.specmap["HCHO"], :] .= 50*rand()  
+    c0[jpm.specmap["HO₂"], :]  .= 0.01*rand()
+    c0[jpm.specmap["H₂O₂"], :] .= 10*rand()
+    c0[jpm.specmap["OH"], :]   .= 0.001*rand() 
+    c0[jpm.specmap["MCO₃"], :] .= 0.01*rand()
+    c0[jpm.specmap["PAN"], :]  .= 25*rand()
+    c0[jpm.specmap["ALD2"], :] .= 10*rand()
+    c0[jpm.specmap["MGLY"], :] .= 50*rand()
+    # Convert concentrations to molecules/cm^3
+    c0 = ppb_to_molec_cm3.(c0, tempk, press)
 
-# Initialize concentrations from uniform distribution, ranges per SI of https://doi.org/10.1029/2020JD032759
-c0[jpm.specmap["O3"], :]   .= 100*rand()         
-c0[jpm.specmap["NO"], :]   .= 20*rand()   
-c0[jpm.specmap["NO2"], :]  .= 20*rand()
-c0[jpm.specmap["HCHO"], :] .= 20*rand()   
-c0[jpm.specmap["HO2"], :]  .= 0.01*rand()
-c0[jpm.specmap["HO2H"], :] .= 10*rand()
-c0[jpm.specmap["HO"], :]   .= 0.01*rand() 
-c0[jpm.specmap["MCO3"], :] .= 10*rand()
-c0[jpm.specmap["PAN"], :]  .= 25*rand()
-c0[jpm.specmap["ALD2"], :] .= 10*rand()
-c0[jpm.specmap["MGLY"], :] .= 50*rand()
-c0 = ppb_to_molec_cm3.(c0, tempk, press)
+    # Define the time span for the simulation
+    tspan = (0, 900*2)
+    # Create the ODE problem
+    prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
 
+    # Solve the ODE problem
+    sol = solve(prob, Rosenbrock23(), saveat=1.0, progress=true)
 
-tspan = (0, 900)
-prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
+    # Get indices of variables to plot
+    indices = [jpm.specmap[var] for var in vars_to_plot]
+    # Extract the variables at every time step
+    selected_vars = [state[indices] for state in sol.u]
+    # Transpose the matrix to get each variable as a separate vector
+    selected_vars_transposed = transpose(hcat(selected_vars...))
+    # Convert to ppb
+    selected_vars_transposed = molec_cm3_to_ppb.(selected_vars_transposed, tempk, press)
 
-# solve the problem using Rosenbrock23
-sol = solve(prob, Rosenbrock23(), saveat=1.0, progress=true)
-# sol = solve(prob, Euler(), saveat=1.0,dt = 1e-3, progress=true)
-
-
-
-# plot O3, NO, NO2, HCHO trajectories
-# Define the variables to plot and get their indices
-# vars_to_plot = ["O3", "NO", "NO2", "HCHO"]
-vars_to_plot = ["O3", "NO", "NO2", "HCHO", 
-                "HO2", "HO2H", "HO", "HNO3", 
-                "CO", "H2", "H2O", "O2", 
-                "ALD2","MGLY","MCO3","PAN"]
-indices = [jpm.specmap[var] for var in vars_to_plot]
-# Extract the variables at every time step
-selected_vars = [state[indices] for state in sol.u]
-# Transpose the matrix to get each variable as a separate vector
-selected_vars_transposed = transpose(hcat(selected_vars...))
-# convert to ppb
-selected_vars_transposed = molec_cm3_to_ppb.(selected_vars_transposed, tempk, press)
-# Plot each variable as its own subplot
-# Create a new plot with a subplot for each variable
-num_vars = length(vars_to_plot)
-fig_height = 200 * num_vars  # Adjust height per variable
-fig_width = 800  # Standard width
-p = plot(layout = (num_vars, 1), size = (fig_width, fig_height))
-# Add each variable to the plot
-for (i, var) in enumerate(vars_to_plot)
-    plot!(p[i], sol.t, selected_vars_transposed[:,i],legend=false)
-    # set ylims to be 0 to the max value of the variable
-    ylims!(p[i], (0, maximum(selected_vars_transposed[:,i])))
-    xlabel!(p[i], "Time [seconds]")
-    ylabel!(p[i], var * " [ppb]")
-    title!(p[i], var)
-
+    # Plot each variable as its own subplot
+    num_vars = length(vars_to_plot)
+    fig_height = 200 * num_vars  # Adjust height per variable
+    fig_width = 800  # Standard width
+    p = plot(layout = (num_vars, 1), size = (fig_width, fig_height))
+    # Add each variable to the plot
+    for (i, var) in enumerate(vars_to_plot)
+        plot!(p[i], sol.t, selected_vars_transposed[:,i], legend=false, left_margin=6Measures.mm)
+        ylims!(p[i], (0, maximum(selected_vars_transposed[:,i])))
+        xlabel!(p[i], "Time [seconds]")
+        ylabel!(p[i], var * " [ppb]")
+        title!(p[i], var)
+    end
+    display(p)
 end
-display(p)
 
+function plot_selected_vars_transposed(selected_vars_transposed, vars_to_plot, sol_t, tempk, press)
+    # Plot each variable as its own subplot
+    num_vars = length(vars_to_plot)
+    fig_height = 200 * num_vars  # Adjust height per variable
+    fig_width = 800  # Standard width
+    p = plot(layout = (num_vars, 1), size = (fig_width, fig_height))
+    # Add each variable to the plot
+    for (i, var) in enumerate(vars_to_plot)
+        plot!(p[i], sol_t, selected_vars_transposed[:,i], legend=false, left_margin=6Measures.mm)
+        # ylims!(p[i], (0, maximum(selected_vars_transposed[:,i])))
+        xlabel!(p[i], "Time [seconds]")
+        ylabel!(p[i], var * " [ppb]")
+        title!(p[i], var)
+    end
+    display(p)
+end
+
+# plot_trajectories(jpm, tempk, press)
+
+z = rand(Float64)*2000 # up to 2 km
+function barometric(z::Float64)
+    # This function calculates the pressure and temperature at a given altitude
+    # assuming an vertically averaged temperature of 288.2 
+    # and a dry adiabatic lapse rate of 9.8e-3 ˚C/m
+    tempk = Float64(298.0) - Float64(9.8e-3)*z   # assume dry adiabatic lapse rate of 9.8e-3 ˚C/m
+    press = Float64(1.0)*exp(-z*9.81/8.31*29e-3/288.2) #  hypsometric equation, assume average temp of 298 + (298-9.8*2)
+    return tempk, press
+end
 
 # mass balance checker:
 # does jpm.atoms * the tendencies equal zero?
 # if so, mass is conserved
 # tendencies are the difference in concentration at each time step
-M = jpm.atoms[indices,:]
-tendencies = diff(selected_vars_transposed, dims=1)
-mass_balance = tendencies*M
+# M = jpm.atoms[indices,:]
+# tendencies = diff(selected_vars_transposed, dims=1)
+# mass_balance = tendencies*M
 
 
 
-# run the specified number of reference model simulations for the given timelength,
-# and return results spaced at the given time step length,
-# both in minutes.
-# function random_sims(m::ChemSys, nruns::Int, minutes, saveat, idx)
-#     c0 = zeros(Float64,length(m.specmap))
-#         c0[m.specmap["O3"], :] .= 0.001*10^(2*rand())         # 03 range: 0.001 - 0.1 ppm
-#         c0[m.specmap["NO"], :] .= 0.0015*10^(2*rand())        # NO range: 0.0015 - 0.15
-#         c0[m.specmap["NO2"], :] .= 0.0015*10^(2*rand())        # NO2 range: 0.0015 - 0.15
-#         c0[m.specmap["HCHO"], :] .= 0.02*10^(2*rand())          # HCHO range: 0.02 - 2 ppm
-#         c0[m.specmap["HO2"], :] .= 1.0e-05 * rand()            # HO2. range: 1 - 10 *ppt*
-#         c0[m.specmap["HO2H"], :] .= 0.01*rand()	               # HO2H range: 0.001 - 0.01 ppm
-#         #c[7:11] = zeros(Float64,1,5)
-#     c0[m.specmap["O2"], :] .= 0.21e6	               # O2: 0.21e6 ppm
-
-#     tspan = (0, minutes) # minutes
-#     prob = ODEProblem(m.rn, c0, tspan, m.p)
-#     # 
+# function to run N simulations of 1 hour, with random initial conditions, sampling every 5 minutes
+function run_simulations(num_tests::Int, duration::Float64, sampling_interval::Float64)
+    # num_tests = 1
+    # duration = 3600.0
+    # sampling_interval = 300.0
+    # print number of experiments
     
-#     # press, tempk, emission1, emission2, emission3, hv_shift
-#     p_lower = [0.9, 288.0, 0.5, 0.5, 0.5, 0.0 ,0.0, 0.0, 0.0]
-#     p_upper = [1.1, 308.0, 1.5, 1.5, 1.5, 2*pi , 2*pi, 2*pi, 1440.0]
-#     # select set of Sobol-sampled parameter vectors
-#     #Random.seed!(42)
-#     para = Surrogates.sample(3750, p_lower, p_upper, SobolSample())[nruns * idx+1 : nruns * idx+nruns]
-#     #println(para)
+    indices = [jpm.specmap[var] for var in ["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"]]
+    label = ["Experiment number", "Time (min)", "O3 [ppb]", "NO [ppb]", "NO2 [ppb]", "HCHO [ppb]", "HO2 [ppb]", "H2O2 [ppb]", "OH [ppb]", "HNO3 [ppb]", "CO [ppb]", "H2 [ppb]", "ALD2 [ppb]", "MGLY [ppb]", "MCO3 [ppb]", "PAN [ppb]", "H2O [ppb]", "O2 [ppb]"]
+    num_time_points = Int(duration / sampling_interval)+1
+    experiments_array = Array{Any}(undef, (num_tests * num_time_points + 1), length(label))
+    experiments_array[1,:] = label
 
-#     function prob_func(prob,i,repeat)
-#         # prob.u0[:] = c0[:, i]
-#         #press = 0.95 + rand() * 0.1                 # 0.9  -  1.1
-#         #tempk = 298.0 + rand() * 20 - 10           # 288  -  308
-#         #emission = 0.2 .+ rand(3) * 1.8              # 0.2  -  2
-#         #hv_shift = rand()*1440                        # 0 - 1440
-#         # println("emission\n")
-#         m = ChemSys(para[i][1], para[i][2], collect(para[i][3:8]), para[i][9])
-#         prob = ODEProblem(m.rn, c0, tspan, m.p)
-#     end
+    row_index = 2
+    for i in 1:num_tests
+        println("Experiment number: ", i)
+        # Initialize c0 with zeros
+        c0 = zeros(Float64, length(jpm.specmap))
+        # Set specific initial conditions
+        c0[jpm.specmap["O₂"], :] .= 0.21e6  # O₂: 0.21e6 ppm
+        # Initialize concentrations from uniform distribution
+        c0[jpm.specmap["O₃"], :]   .= 50*rand()         
+        c0[jpm.specmap["NO"], :]   .= 20*rand()   
+        c0[jpm.specmap["NO₂"], :]  .= 20*rand()
+        c0[jpm.specmap["HCHO"], :] .= 50*rand()  
+        c0[jpm.specmap["HO₂"], :]  .= 0.01*rand()
+        c0[jpm.specmap["H₂O₂"], :] .= 10*rand()
+        c0[jpm.specmap["OH"], :]   .= 0.001*rand() 
+        c0[jpm.specmap["MCO₃"], :] .= 0.01*rand()
+        c0[jpm.specmap["PAN"], :]  .= 25*rand()
+        c0[jpm.specmap["ALD2"], :] .= 10*rand()
+        c0[jpm.specmap["MGLY"], :] .= 50*rand()
+        # Convert concentrations to molecules/cm^3
+        c0 = ppb_to_molec_cm3.(c0, tempk, press)
+        # Define the time span for the simulation
+        tspan = (0, duration)
+        # Create the ODE problem
+        prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
+        # Solve the ODE problem
+        global sol = solve(prob, Rosenbrock23(), saveat=sampling_interval, progress=false)
+        # Extract the variables at every time step
+        selected_vars = [state[indices] for state in sol.u]
+        # create array
+        global selected_vars_transposed = transpose(hcat(selected_vars...))
+        # Convert to ppb
+        selected_vars_transposed = molec_cm3_to_ppb.(selected_vars_transposed, tempk, press)
+        for (t, time_point) in enumerate(0:sampling_interval:duration)
+            # print the time point
+            # println("Time point: ", time_point)
+            experiments_array[row_index, :] = [i, time_point, selected_vars_transposed[t, :]...]
+            row_index += 1
+        end
+    end
+    return experiments_array
+end
 
-#     ensemble_prob = EnsembleProblem(prob, prob_func=prob_func)
+# number_of_experiments = Integer(1e6)
+Number_of_experiments = 1
+experiments_array = run_simulations(number_of_experiments, 3600.0, 300.0)
 
-#     res = solve(ensemble_prob, Rosenbrock23(), trajectories=nruns, saveat=saveat,maxiters=Int(1e10), progress=true)
-#     return res, para
+# save the experiments array to a csv file
+CSV.write("experiments_array.csv", 
+          DataFrame(experiments_array[2:end, :], 
+          Symbol.(experiments_array[1, :])))
+
+# convert csv array to selected_vars_transposed
+# selected_vars_transposed = experiments_array[2:end, 3:end]
+# time_points = experiments_array[2:end, 2]
+# plot_selected_vars_transposed(selected_vars_transposed, ["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"], time_points, tempk, press)
+
+
 # end
 
 
