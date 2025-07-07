@@ -5,6 +5,8 @@ using Catalyst
 using Random
 using Plots, GraphRecipes
 using CSV
+using DataFrames
+
 
 export ChemSys, jpm
 ENV["PATH"] = "/opt/homebrew/bin:" * ENV["PATH"] # to get the graphs.jl access
@@ -16,6 +18,22 @@ hv = 1
 # seed the random number generator
 Random.seed!(42)
 
+
+arrhenius(A,EdivR,tempk) = A * exp(-EdivR/tempk)
+molcm3frompressure(tempk,press) = 6.022e23 * press / (.0821 * tempk) / 1e3 # 6.022e23 is Avogadro's number, .0821 is R in L atm K-1 mol-1, and there are 1e3 cm3 in a L
+function termolecular(k₀298,n, k∞298, m, tempk,press)
+    # calculate rate constant in the low pressure limit
+    k₀ = k₀298 * (tempk/298.0)^(-n) # cm6 molec-2 s-1
+    # calculate rate constant in the high pressure limit
+    k∞ = k∞298 * (tempk/298.0)^(-m) # cm3 molec-1 s-1
+    # calculate M, the total gas Concentration
+    M = molcm3frompressure(tempk,press) # molec/cm3
+    # calculate the effective second-order rate constant
+    kf = ( k∞ * k₀ * M ) / (k∞ + k₀ * M ) * 0.6^(1.0 / ( 1.0 + (log10(k₀*M/k∞))^2.0 ))
+    return kf 
+end
+
+
 function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # function definition to convert from cm3 molec-1 s-1 to (ppm min)-1
 	# 7.34e15 is Avogadro's number divided by R in L atm K-1 mol-1 divided by 1000 to convert to cm3 from L and 1e6 to convert to (ppm)-1
@@ -23,19 +41,6 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # rkppmmin(rk,press,tempk) = rk * 60.0 *  7.34e+15 * press / tempk 
 
     # make a function arrhenius(A,(E/R),tempk) to calculate the rate constant
-    arrhenius(A,EdivR,tempk) = A * exp(-EdivR/tempk)
-    molcm3frompressure(tempk,press) = 6.022e23 * press / (.0821 * tempk) / 1e3 # 6.022e23 is Avogadro's number, .0821 is R in L atm K-1 mol-1, and there are 1e3 cm3 in a L
-    function termolecular(k₀298,n, k∞298, m, tempk,press)
-        # calculate rate constant in the low pressure limit
-        k₀ = k₀298 * (tempk/298.0)^(-n) # cm6 molec-2 s-1
-        # calculate rate constant in the high pressure limit
-        k∞ = k∞298 * (tempk/298.0)^(-m) # cm3 molec-1 s-1
-        # calculate M, the total gas Concentration
-        M = molcm3frompressure(tempk,press) # molec/cm3
-        # calculate the effective second-order rate constant
-        kf = ( k∞ * k₀ * M ) / (k∞ + k₀ * M ) * 0.6^(1.0 / ( 1.0 + (log10(k₀*M/k∞))^2.0 ))
-        return kf 
-    end
 
     # Reaction rate constants
 
@@ -45,7 +50,7 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     # rk2(tempk,press) = molcm3frompressure(tempk,press)*6.1e-34*(tempk/298)^(-2.4)
 
     # Reaction 1 is NO₂ → NO + O₃
-    # photolysis reaction, rate constant from original mechanism
+    # photolysis reaction, rate constant from original mechanism below
     # rk1(hv) = 0.5 * hv / 60 # converting to seconds
     # this is a photolysis reaction with rate constant sampled from the GEOS-CF
     # chemical state at the surface of Los Angeles, using the KPP Standalone interface
@@ -97,7 +102,7 @@ function newmodel(press=1.0::Float64, tempk=298.0::Float64)
     rk7(tempk,press) = termolecular(1.8e-30,3.0,2.8e-11,0,tempk,press)
 
     # Reaction 8 is H₂O₂ → 2HO
-    # this is a photolysis reaction, rate constant from original mechanism
+    # this is a photolysis reaction, rate constant from original mechanism below
     # rk8(hv) = 0.0003 * hv / 60 # converting to seconds
     # this is a photolysis reaction with rate constant sampled from the GEOS-CF
     # chemical state at the surface of Los Angeles, using the KPP Standalone interface
@@ -224,7 +229,8 @@ ChemSys(press=1.0::Real, tempk=298.0::Real) = ChemSys(newmodel(press, tempk)...)
 jpm = ChemSys()
 graph = Graph(jpm.rn)
 # save the graph to a file
-savegraph(graph,"jpm-graph.pdf","pdf")
+# savegraph(graph,"jpm-graph.pdf","pdf")
+savegraph(graph,"jpm-graph.png","png")
 
 function plot_trajectories(jpm, tempk, press, vars_to_plot=["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"])
     # Initialize c0 with zeros
@@ -250,7 +256,7 @@ function plot_trajectories(jpm, tempk, press, vars_to_plot=["O₃", "NO", "NO₂
     # Define the time span for the simulation
     tspan = (0, 900*2)
     # Create the ODE problem
-    prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
+    prob = ODEProblem(jpm.rn, c0, tspan, jpm.p,combinatoric_ratelaws = false)
 
     # Solve the ODE problem
     sol = solve(prob, Rosenbrock23(), saveat=1.0, progress=true)
@@ -356,7 +362,8 @@ function run_simulations(num_tests::Int, duration::Float64, sampling_interval::F
         # Define the time span for the simulation
         tspan = (0, duration)
         # Create the ODE problem
-        prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
+        # prob = ODEProblem(jpm.rn, c0, tspan, jpm.p)
+        prob = ODEProblem(jpm.rn, c0, tspan, jpm.p, combinatoric_ratelaws = false)
         # Solve the ODE problem
         global sol = solve(prob, Rosenbrock23(), saveat=sampling_interval, progress=false)
         # Extract the variables at every time step
@@ -376,13 +383,42 @@ function run_simulations(num_tests::Int, duration::Float64, sampling_interval::F
 end
 
 # number_of_experiments = Integer(1e6)
-Number_of_experiments = 1
+number_of_experiments = Integer(1)
+# number_of_experiments = 3
 experiments_array = run_simulations(number_of_experiments, 3600.0, 300.0)
-
 # save the experiments array to a csv file
-CSV.write("experiments_array.csv", 
-          DataFrame(experiments_array[2:end, :], 
-          Symbol.(experiments_array[1, :])))
+# CSV.write("experiments_11e5_1hour_5mins_falsecombinatoricratelaws.csv", 
+#           DataFrame(experiments_array[2:end, :], 
+#           Symbol.(experiments_array[1, :])))
+
+# mass balance checker
+M = zeros(Int, 16, 4)
+M[1,  :] = [0, 0, 0, 3]  # O₃
+M[2,  :] = [0, 1, 0, 1]  # NO
+M[3,  :] = [0, 1, 0, 2]  # NO₂
+M[4,  :] = [1, 0, 2, 1]  # HCHO
+M[5,  :] = [0, 0, 1, 2]  # HO₂
+M[6,  :] = [0, 0, 2, 2]  # H₂O₂
+M[7,  :] = [0, 0, 1, 1]  # OH
+M[8,  :] = [0, 1, 1, 3]  # HNO₃
+M[9,  :] = [1, 0, 0, 1]  # CO
+M[10, :] = [0, 0, 2, 0]  # H₂
+M[11, :] = [2, 0, 4, 1]  # ALD2
+M[12, :] = [3, 0, 4, 2]  # MGLY
+M[13, :] = [2, 0, 3, 3]  # MCO₃
+M[14, :] = [2, 1, 3, 5]  # PAN
+M[15, :] = [0, 0, 2, 1]  # H₂O
+M[16, :] = [0, 0, 0, 2]  # O₂
+
+# get the tendencies for all experiments
+tendencies_diff = diff(experiments_array[2:end, 3:end], dims=1)
+# skip every 12 rows to get the tendencies for each time point
+tendencies = tendencies_diff[1:13:end, :]
+
+maximum(tendencies*M, dims=1)
+
+
+
 
 # convert csv array to selected_vars_transposed
 # selected_vars_transposed = experiments_array[2:end, 3:end]
@@ -392,4 +428,35 @@ CSV.write("experiments_array.csv",
 
 # end
 
+B = netstoichmat(jpm.rn)
+# use B to get an edgelist. Every row indexes a species. Every column index is a reaction
+# The value in the matrix is the stoichiometric coefficient of the species in the reaction
+# The edgelist is a list of tuples (species, reaction, stoichiometric coefficient)
+edgelist = []
+species_names = species(jpm.rn)
+for j in 1:size(B, 2)
+    for i in 1:size(B, 1)
+        species_name = replace(string(species_names[i]), "(t)" => "")
+        # replace ₂ with 2 and same for 3
+        species_name = replace(species_name, "₂" => "2")
+        species_name = replace(species_name, "₃" => "3")
+    
+        if B[i, j] < 0
+            push!(edgelist, (i, species_name, "R"*string(j), abs(B[i, j])))
+        elseif B[i, j] > 0
+            push!(edgelist, (i, "R"*string(j), species_name, abs(B[i, j])))
+        end
+    end
+end
 
+println(edgelist)
+
+# save the edgelist to a csv file
+# with the header:
+header = ["species index (starts from 1)","from","to","stoichiometric value "]
+# Create the DataFrame without specifying the header
+df = DataFrame(edgelist)
+
+# Rename the columns to the desired string headers
+rename!(df, header)
+# CSV.write("jpm_edgelist.csv", df)
