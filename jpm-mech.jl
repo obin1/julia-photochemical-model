@@ -8,7 +8,7 @@ using CSV
 using DataFrames
 
 
-export ChemSys, jpm
+export JPMStruct, jpm
 ENV["PATH"] = "/opt/homebrew/bin:" * ENV["PATH"] # to get the graphs.jl access
 press=1.0
 tempk=298.0
@@ -199,7 +199,7 @@ function julia_photochem(press=1.0::Float64, tempk=298.0::Float64)
         rk11/(O₂^2), MGLY + 2O₂ → MCO₃ + CO + HO₂  # rate law not proportional to O₂
         rk12, MCO₃ + NO₂ → PAN
         rk13, PAN → MCO₃ + NO₂
-        rk14, PAN + OH → HCHO + CO + NO₂ + H₂O
+        rk14, PAN + OH → HCHO + CO + NO₂ + H₂ + O₂
         rk15, O₃ + OH → HO₂ + O₂
         # All species go to null for testing
         # rk2*1e12, NO₂ → ∅;
@@ -248,7 +248,7 @@ function julia_photochem(press=1.0::Float64, tempk=298.0::Float64)
     return rn, atoms, specmap, p, f_uncertainty
 end
 
-struct ChemSys
+struct JPMStruct
     rn
     atoms::Array{Float64, 2}
     specmap::Dict
@@ -267,14 +267,17 @@ function molec_cm3_to_ppb(molec_cm3::Float64, tempk::Float64, press::Float64)
 end
 
 
-ChemSys(press=1.0::Real, tempk=298.0::Real) = ChemSys(julia_photochem(press, tempk)...)
-jpm = ChemSys()
+JPMStruct(press=1.0::Real, tempk=298.0::Real) = JPMStruct(julia_photochem(press, tempk)...)
+jpm = JPMStruct()
 graph = Graph(jpm.rn)
 # save the graph to a file
 # savegraph(graph,"jpm-graph.pdf","pdf")
 savegraph(graph,"jpm-graph.png","png")
 
 function plot_trajectories(jpm, tempk, press, vars_to_plot=["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"])
+    tempk = 283.0 + 20.0*rand() # random temperature between 283 and 303 K
+    jpm = JPMStruct(press, tempk)
+
     # Initialize c0 with zeros
     c0 = zeros(Float64, length(jpm.specmap))
     # Set specific initial conditions
@@ -357,136 +360,6 @@ function barometric(z::Float64)
     return tempk, press
 end
 
-# mass balance checker:
-# does jpm.atoms * the tendencies equal zero?
-# if so, mass is conserved
-# tendencies are the difference in concentration at each time step
-M = jpm.atoms[indices,:]
-tendencies = diff(selected_vars_transposed, dims=1)
-mass_balance = tendencies*M
-
-# function get_reaction_rates(jpm, concentrations)
-#     ns = length(jpm.rn.states)
-#     nr = length(jpm.rn.eqs)
-    
-#     # Unpack the reaction rate constants (if needed)
-#     rk1, rk2, rk3, rk4, rk5, rk6, rk7, rk8, rk9, rk10, rk11, rk12, rk13 = jpm.p
-
-#     # Build the symbolic reaction vector for each reaction in the network
-#     symbolicreactionvector = [oderatelaw(jpm.rn.eqs[i], combinatoric_ratelaw=false) for i in 1:nr]
-#     expr = build_function(symbolicreactionvector,
-#                           vcat([jpm.rn.states[i] for i in 1:ns],
-#                                [jpm.rn.eqs[i].rate for i in 1:nr]))
-#     # evaluate_rxn_rate = eval(expr[2])
-#     evaluate_rxn_rate = eval(expr[2])
-
-#     reaction_rates = zeros(Float64, nr)
-    
-#     # Evaluate the reaction rates given the concentrations and the parameters
-#     evaluate_rxn_rate(reaction_rates, vcat(concentrations, jpm.p))
-    
-#     return reaction_rates
-# end
-
-# function get_chemical_states(num_experiments::Int)
-# num_experiments = 1000
-#     # This runs num_experiments simulations of the JPM mechanism
-#     # with random initial conditions and returns the final chemical state of each simulation
-#     # including the reaction rates
-#     # concentrations and reaction rates in molecules/cm^3 and molecules/cm^3/s
-#     # initialize the column names vector
-#     indices = [jpm.specmap[var] for var in ["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"]]
-#     ns = length(jpm.rn.states)
-#     nr = length(jpm.rn.eqs)
-#     reaction_rate_label = ["R"*string(i) for i in 1:nr]
-#     rate_constant_label = ["k"*string(i) for i in 1:nr]
-#     rate_constant_uncertainty_label = ["f"*string(i) for i in 1:nr]
-#     label = ["Experiment number", "O3", "NO", 
-#              "NO2", "HCHO", "HO2",
-#              "H2O2", "OH", "HNO3", 
-#              "CO", "H2", "ALD2", 
-#              "MGLY", "MCO3", "PAN", 
-#              "H2O", "O2",
-#              reaction_rate_label..., 
-#              rate_constant_label...,
-#              rate_constant_uncertainty_label...]
-
-#     # Initialize the experiments array
-#     experiments_array = Array{Any}(undef, (num_experiments + 1), length(label))
-#     experiments_array[1,:] = label
-
-#     # Unpack the reaction rate constants (if needed)
-#     rk1, rk2, rk3, rk4, rk5, rk6, rk7, rk8, rk9, rk10, rk11, rk12, rk13 = jpm.p
-
-#     # Loop over the number of experiments
-#     for i in 1:num_experiments
-#         println("Experiment number: ", i)
-        
-#         # Initialize c0 with zeros
-#         c0 = zeros(Float64, length(jpm.specmap))
-#         # Set specific initial conditions
-#         c0[jpm.specmap["O₂"], :] .= 0.21e9  # O₂: 0.21e9 ppb
-
-#         # Initialize concentrations from uniform distribution
-#         c0[jpm.specmap["O₃"], :]   .= 50*rand()         
-#         c0[jpm.specmap["NO"], :]   .= 20*rand()   
-#         c0[jpm.specmap["NO₂"], :]  .= 20*rand()
-#         c0[jpm.specmap["HCHO"], :] .= 50*rand()  
-#         c0[jpm.specmap["HO₂"], :]  .= 0.01*rand()
-#         c0[jpm.specmap["H₂O₂"], :] .= 10*rand()
-#         c0[jpm.specmap["OH"], :]   .= 0.001*rand() 
-#         c0[jpm.specmap["MCO₃"], :] .= 0.01*rand()
-#         c0[jpm.specmap["PAN"], :]  .= 25*rand()
-#         c0[jpm.specmap["ALD2"], :] .= 10*rand()
-#         c0[jpm.specmap["MGLY"], :] .= 50*rand()
-        
-#         # Convert concentrations to molecules/cm^3
-#         tempk, press = barometric(1.0) # assume a height of 1000 m
-#         c0 = ppb_to_molec_cm3.(c0, tempk, press)
-
-#         # run for 20 minutes
-#         tspan = (0.0, 1200.0) # 20 minutes in seconds
-#         # Create the ODE problem
-#         prob = ODEProblem(jpm.rn, c0, tspan, jpm.p, combinatoric_ratelaws = false)
-#         # Solve the ODE problem
-#         sol = solve(prob, Rosenbrock23(), saveat=1200.0, progress=false)
-        
-#         # get the final 
-#         cfinal = sol.u[end]
-
-#         # Build the symbolic reaction vector for each reaction in the network
-#         symbolicreactionvector = [oderatelaw(jpm.rn.eqs[i], combinatoric_ratelaw=false) for i in 1:nr]
-#         expr = build_function(symbolicreactionvector,
-#                             vcat([jpm.rn.states[i] for i in 1:ns],
-#                                 [jpm.rn.eqs[i].rate for i in 1:nr]))
-#         # evaluate_rxn_rate = eval(expr[2])
-#         evaluate_rxn_rate = eval(expr[2])
-
-#         reaction_rates = zeros(Float64, nr)
-
-
-        
-#         # Evaluate the reaction rates given the concentrations and the parameters
-#         evaluate_rxn_rate(reaction_rates, vcat(cfinal, jpm.p))
-#         # create the row for the experiments array
-#         experiments_array[i+1, :] = vcat([Integer(i)], 
-#                                          cfinal[indices], 
-#                                          reaction_rates, 
-#                                          jpm.p,
-#                                          jpm.f_uncertainty)
-                                        
-
-#     end
-
-# save the experiments array to a CSV file
-# CSV.write("jpm_chemical_states_moleccm3.csv", DataFrame(experiments_array[2:end, :],experiments_array[1, :]))
-    # Return the experiments array
-#     return experiments_array
-# end
-
-# get the chemical states for 2 experiments
-# chemical_states_array = get_chemical_states(num_experiments)
-
 
 # function to run N simulations of 1 hour, with random initial conditions, sampling every 5 minutes
 function run_simulations(num_tests::Int, duration::Float64, sampling_interval::Float64)
@@ -494,15 +367,20 @@ function run_simulations(num_tests::Int, duration::Float64, sampling_interval::F
     # duration = 3600.0
     # sampling_interval = 300.0
     # print number of experiments
+
+    # create JPM based on random temperature conditions
+
     
     indices = [jpm.specmap[var] for var in ["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"]]
-    label = ["Experiment number", "Time (min)", "O3 [ppb]", "NO [ppb]", "NO2 [ppb]", "HCHO [ppb]", "HO2 [ppb]", "H2O2 [ppb]", "OH [ppb]", "HNO3 [ppb]", "CO [ppb]", "H2 [ppb]", "ALD2 [ppb]", "MGLY [ppb]", "MCO3 [ppb]", "PAN [ppb]", "H2O [ppb]", "O2 [ppb]"]
+    label = ["Experiment number", "Temperature (K)", "Time (min)", "O3 [ppb]", "NO [ppb]", "NO2 [ppb]", "HCHO [ppb]", "HO2 [ppb]", "H2O2 [ppb]", "OH [ppb]", "HNO3 [ppb]", "CO [ppb]", "H2 [ppb]", "ALD2 [ppb]", "MGLY [ppb]", "MCO3 [ppb]", "PAN [ppb]", "H2O [ppb]", "O2 [ppb]"]
     num_time_points = Int(duration / sampling_interval)+1
     experiments_array = Array{Any}(undef, (num_tests * num_time_points + 1), length(label))
     experiments_array[1,:] = label
 
     row_index = 2
     for i in 1:num_tests
+        tempk = 283.0 + 20.0*rand() # random temperature between 283 and 303 K
+        jpm = JPMStruct(press, tempk) # initialize the mechanism with a new temperature
         println("Experiment number: ", i)
         # Initialize c0 with zeros
         c0 = zeros(Float64, length(jpm.specmap))
@@ -538,7 +416,7 @@ function run_simulations(num_tests::Int, duration::Float64, sampling_interval::F
         for (t, time_point) in enumerate(0:sampling_interval:duration)
             # print the time point
             # println("Time point: ", time_point)
-            experiments_array[row_index, :] = [i, time_point, selected_vars_transposed[t, :]...]
+            experiments_array[row_index, :] = [i, tempk, time_point, selected_vars_transposed[t, :]...]
             row_index += 1
         end
     end
@@ -546,7 +424,7 @@ function run_simulations(num_tests::Int, duration::Float64, sampling_interval::F
 end
 
 # number_of_experiments = Integer(1e6)
-number_of_experiments = Integer(10)
+number_of_experiments = Integer(1000)
 # number_of_experiments = 3
 experiments_array = run_simulations(number_of_experiments, 3600.0, 300.0)
 
@@ -570,46 +448,46 @@ M[15, :] = [0, 0, 2, 1]  # H₂O
 M[16, :] = [0, 0, 0, 2]  # O₂
 
 # get the tendencies for all experiments
-tendencies_diff = diff(experiments_array[2:end, 3:end], dims=1)
+tendencies_diff = diff(experiments_array[2:end, 4:end], dims=1)
 # skip every 12 rows to get the tendencies for each time point
 tendencies = tendencies_diff[1:13:end, :]
-
 maximum(tendencies*M, dims=1)
 
 
 # save the experiments array to a csv file
-# CSV.write("experiments_11e5_1hour_5mins_falsecombinatoricratelaws.csv", 
-#           DataFrame(experiments_array[2:end, :], 
-#           Symbol.(experiments_array[1, :])))
+CSV.write("1000experiments_JPMv1.2_varyingtemperature.csv", 
+          DataFrame(experiments_array[2:end, :], 
+          Symbol.(experiments_array[1, :])))
 
 # convert csv array to selected_vars_transposed
-# selected_vars_transposed = experiments_array[2:end, 3:end]
-# time_points = experiments_array[2:end, 2]
+# selected_vars_transposed = experiments_array[2:end, 4:end]
+# time_points = experiments_array[2:end, 3]
 # plot_selected_vars_transposed(selected_vars_transposed, ["O₃", "NO", "NO₂", "HCHO", "HO₂", "H₂O₂", "OH", "HNO₃", "CO", "H₂", "ALD2", "MGLY", "MCO₃", "PAN", "H₂O", "O₂"], time_points, tempk, press)
 
 
 # end
 
-B = netstoichmat(jpm.rn)
+# B = netstoichmat(jpm.rn)
+# B = B[indices,:]
 # use B to get an edgelist. Every row indexes a species. Every column index is a reaction
 # The value in the matrix is the stoichiometric coefficient of the species in the reaction
 # The edgelist is a list of tuples (species, reaction, stoichiometric coefficient)
-edgelist = []
-species_names = species(jpm.rn)
-for j in 1:size(B, 2)
-    for i in 1:size(B, 1)
-        species_name = replace(string(species_names[i]), "(t)" => "")
-        # replace ₂ with 2 and same for 3
-        species_name = replace(species_name, "₂" => "2")
-        species_name = replace(species_name, "₃" => "3")
+# edgelist = []
+# species_names = species(jpm.rn)
+# for j in 1:size(B, 2)
+#     for i in 1:size(B, 1)
+#         species_name = replace(string(species_names[i]), "(t)" => "")
+#         # replace ₂ with 2 and same for 3
+#         species_name = replace(species_name, "₂" => "2")
+#         species_name = replace(species_name, "₃" => "3")
     
-        if B[i, j] < 0
-            push!(edgelist, (i, species_name, "R"*string(j), abs(B[i, j])))
-        elseif B[i, j] > 0
-            push!(edgelist, (i, "R"*string(j), species_name, abs(B[i, j])))
-        end
-    end
-end
+#         if B[i, j] < 0
+#             push!(edgelist, (i, species_name, "R"*string(j), abs(B[i, j])))
+#         elseif B[i, j] > 0
+#             push!(edgelist, (i, "R"*string(j), species_name, abs(B[i, j])))
+#         end
+#     end
+# end
 
 # println(edgelist)
 
